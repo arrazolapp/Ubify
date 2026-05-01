@@ -342,6 +342,18 @@ body.light{background:#e8e0d5}
 <script>
 // ═══ CONFIG ═══
 let COMPANY_ID='demo_corp', USER_ID='', userName='Agente';
+
+// ── POSICIÓN DEL CURSOR EN PANTALLA ──────────────────────
+// Ajustá estos dos valores para mover el cursor:
+//   CURSOR_OFFSET_Y: píxeles desde abajo de la barra inferior
+//                    + número = cursor más ARRIBA
+//                    - número = cursor más ABAJO (puede quedar detrás de la barra)
+//   CURSOR_OFFSET_X: píxeles desde el centro horizontal
+//                    + número = cursor más a la DERECHA
+//                    - número = cursor más a la IZQUIERDA
+const CURSOR_OFFSET_Y = 90;   // <-- cambiá este valor
+const CURSOR_OFFSET_X = 0;    // <-- cambiá este valor
+// ─────────────────────────────────────────────────────────
 function setConfig(c,u,n){COMPANY_ID=c;USER_ID=u;userName=n;document.getElementById('menuUser').textContent=n;initFirebase();}
 
 firebase.initializeApp({
@@ -633,19 +645,20 @@ function updateFloatingButtons(){
   // NO mover el mapa aquí — eso lo hace updateUserPosition en cada GPS update
 }
 
-// Helper: desplaza el centro para que el cursor quede abajo (nivel velocímetro)
-// Offset vertical fijo en píxeles — el marker de Leaflet no está en el wrapper rotado
-// así que su posición en pantalla siempre es correcta.
+// Helper: cursor a la posición exacta definida por CURSOR_OFFSET_X/Y
 function getOffsetCenter(lat,lng){
   const bar=document.getElementById('bottomBar');
   const barH=bar?bar.offsetHeight:0;
+  const mapW=map.getContainer().offsetWidth;
   const mapH=map.getContainer().offsetHeight;
-  // El cursor debe quedar a (barH + 90px) desde abajo — mismo nivel que velocímetro
-  const targetY=mapH-(barH+90);
+  // Posición objetivo del cursor en pantalla
+  const targetX=mapW/2 + CURSOR_OFFSET_X;          // centro horizontal + offset X
+  const targetY=mapH - barH - CURSOR_OFFSET_Y;      // desde abajo: barra + offset Y
   const cursorPt=map.latLngToContainerPoint([lat,lng]);
-  const dy=cursorPt.y-targetY; // px que hay que desplazar el centro hacia abajo
+  const dx=cursorPt.x - targetX;  // cuántos px mover horizontalmente
+  const dy=cursorPt.y - targetY;  // cuántos px mover verticalmente
   const centerPt=map.latLngToContainerPoint(map.getCenter());
-  return map.containerPointToLatLng(L.point(centerPt.x, centerPt.y+dy));
+  return map.containerPointToLatLng(L.point(centerPt.x+dx, centerPt.y+dy));
 }
 // Observer para detectar cambios de altura en la barra
 const _barObs=new ResizeObserver(()=>updateFloatingButtons());
