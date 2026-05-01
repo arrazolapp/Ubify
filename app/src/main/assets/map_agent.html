@@ -429,7 +429,7 @@ function ensureBearingWrap(){
   const pane=document.querySelector('#map .leaflet-map-pane');
   if(!pane)return null;
   _bWrap=document.createElement('div');
-  _bWrap.style.cssText='position:absolute;inset:0;transform-origin:50% 50%;will-change:transform;transition:transform 0.35s ease;';
+  _bWrap.style.cssText='position:absolute;inset:0;transform-origin:50% 50%;will-change:transform;transition:transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94);';
   pane.parentNode.insertBefore(_bWrap,pane);
   _bWrap.appendChild(pane);
   return _bWrap;
@@ -475,9 +475,14 @@ function recenter(){
   isFollowing=true;
   document.getElementById('speedometer').classList.remove('recenter-mode');
   if(!userLat)return;
-  // Centrar en el usuario con la rotación actual
+  // Restaurar bearing con transición suave del wrapper
   setMapBearing(-curH);
-  map.flyTo(getOffsetCenter(userLat,userLng),17,{duration:0.5});
+  // flyTo suave al offset correcto — animación 0.7s como Waze
+  map.flyTo(getOffsetCenter(userLat,userLng),map.getZoom(),{
+    duration:0.7,
+    easeLinearity:0.5,
+    noMoveStart:true
+  });
 }
 function centerOnUser(){recenter();}
 function onSpeedometerClick(){if(!isFollowing)recenter();}
@@ -631,18 +636,24 @@ function updateFloatingButtons(){
   }
 }
 
-// Helper: calcula la LatLng objetivo para que el cursor quede al 75% del área visible
+// Helper: cursor al ~72% del área visible (abajo como Waze), compensa bearing
 function getOffsetCenter(lat,lng){
   const bar=document.getElementById('bottomBar');
   const barH=bar?bar.offsetHeight:0;
-  const navH=document.querySelector('.nav-top.active')?document.querySelector('.nav-top').offsetHeight:0;
+  const navTopEl=document.querySelector('.nav-top.active');
+  const navH=navTopEl?navTopEl.offsetHeight:0;
   const mapH=map.getContainer().offsetHeight;
-  const visibleH=mapH-barH-navH; // área visible entre barra superior y inferior
-  const targetY=navH + visibleH*0.55; // centrado en la zona visible
+  const visibleH=mapH-barH-navH;
+  // Cursor al 72% del área visible = abajo como Waze
+  const targetY=navH+visibleH*0.72;
   const cursorPt=map.latLngToContainerPoint([lat,lng]);
-  const offsetY=targetY-cursorPt.y;
+  const rawOffsetY=targetY-cursorPt.y;
+  // Compensar bearing: el offset debe ser en la dirección que el mapa está rotado
+  const bearingRad=(-curH)*Math.PI/180;
+  const ox=-rawOffsetY*Math.sin(bearingRad);
+  const oy=-rawOffsetY*Math.cos(bearingRad);
   const centerPt=map.latLngToContainerPoint(map.getCenter());
-  return map.containerPointToLatLng(L.point(centerPt.x,centerPt.y-offsetY));
+  return map.containerPointToLatLng(L.point(centerPt.x-ox,centerPt.y-oy));
 }
 // Observer para detectar cambios de altura en la barra
 const _barObs=new ResizeObserver(()=>updateFloatingButtons());
@@ -815,7 +826,13 @@ function startActiveNav(){
   collapseSearchPanel();
   document.getElementById('navPanel').classList.add('active');
   isFollowing=true;
-  map.flyTo([userLat,userLng],18,{duration:0.8});
+  // Aplicar bearing y subir zoom sin resetear la rotación
+  setMapBearing(-curH);
+  map.flyTo(getOffsetCenter(userLat,userLng),18,{
+    duration:0.8,
+    easeLinearity:0.4,
+    noMoveStart:true
+  });
   updateNavInfo();
 }
 function updateNavInfo(){
