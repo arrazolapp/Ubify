@@ -618,7 +618,7 @@ function showPill(msg){
 function hidePill(){document.getElementById('proxPill').classList.remove('visible');}
 function dismissProxPill(){proxDismissed=true;hidePill();}
 
-// ═══ ÍCONOS FLOTANTES + REENCUADRE DEL MAPA ═══
+// ═══ ÍCONOS FLOTANTES (solo mover botones, NUNCA el mapa) ═══
 function updateFloatingButtons(){
   const bar=document.getElementById('bottomBar');
   const barH=bar?bar.offsetHeight:0;
@@ -630,30 +630,22 @@ function updateFloatingButtons(){
   if(popup&&popup.classList.contains('visible')){
     popup.style.bottom=(barH+8)+'px';
   }
-  // Reencuadrar el mapa para que el cursor no quede detrás de la barra
-  if(isFollowing&&userLat&&map.getContainer()){
-    map.panTo(getOffsetCenter(userLat,userLng),{animate:true,duration:0.35,easeLinearity:0.5,noMoveStart:true});
-  }
+  // NO mover el mapa aquí — eso lo hace updateUserPosition en cada GPS update
 }
 
-// Helper: cursor al ~72% del área visible (abajo como Waze), compensa bearing
+// Helper: desplaza el centro para que el cursor quede abajo (nivel velocímetro)
+// Offset vertical fijo en píxeles — el marker de Leaflet no está en el wrapper rotado
+// así que su posición en pantalla siempre es correcta.
 function getOffsetCenter(lat,lng){
   const bar=document.getElementById('bottomBar');
   const barH=bar?bar.offsetHeight:0;
-  const navTopEl=document.querySelector('.nav-top.active');
-  const navH=navTopEl?navTopEl.offsetHeight:0;
   const mapH=map.getContainer().offsetHeight;
-  const visibleH=mapH-barH-navH;
-  // Cursor al 72% del área visible = abajo como Waze
-  const targetY=navH+visibleH*0.72;
+  // El cursor debe quedar a (barH + 90px) desde abajo — mismo nivel que velocímetro
+  const targetY=mapH-(barH+90);
   const cursorPt=map.latLngToContainerPoint([lat,lng]);
-  const rawOffsetY=targetY-cursorPt.y;
-  // Compensar bearing: el offset debe ser en la dirección que el mapa está rotado
-  const bearingRad=(-curH)*Math.PI/180;
-  const ox=-rawOffsetY*Math.sin(bearingRad);
-  const oy=-rawOffsetY*Math.cos(bearingRad);
+  const dy=cursorPt.y-targetY; // px que hay que desplazar el centro hacia abajo
   const centerPt=map.latLngToContainerPoint(map.getCenter());
-  return map.containerPointToLatLng(L.point(centerPt.x-ox,centerPt.y-oy));
+  return map.containerPointToLatLng(L.point(centerPt.x, centerPt.y+dy));
 }
 // Observer para detectar cambios de altura en la barra
 const _barObs=new ResizeObserver(()=>updateFloatingButtons());
