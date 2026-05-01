@@ -1,0 +1,2 @@
+rootProject.name = "Ubify"
+include ':app'
