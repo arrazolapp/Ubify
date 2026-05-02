@@ -29,10 +29,10 @@ body.light #map{background:#e8e0d5}
 .light .fab-menu span{background:#222}
 .fab{width:50px;height:50px;border-radius:50%;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
 .fab svg{width:26px;height:26px}
-/* fab-alert: mismo glassmorphism que el velocímetro */
-.fab-alert{position:fixed;bottom:185px;right:14px;z-index:800;width:72px;height:72px;border-radius:50%;background:rgba(20,26,38,0.72);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border:1.5px solid rgba(255,255,255,0.10);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.45),inset 0 1px 0 rgba(255,255,255,0.07);overflow:hidden;transition:bottom .3s cubic-bezier(.4,0,.2,1)}
-.fab-alert svg{width:32px;height:32px}
-.light .fab-alert{background:rgba(255,255,255,0.55);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border-color:rgba(255,255,255,0.6);box-shadow:0 4px 16px rgba(0,0,0,0.15),inset 0 1px 0 rgba(255,255,255,0.8)}
+/* fab-alert: ícono de alerta estilo señal de tránsito */
+.fab-alert{position:fixed;bottom:185px;right:14px;z-index:800;width:72px;height:72px;border-radius:16px;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:bottom .3s cubic-bezier(.4,0,.2,1);filter:drop-shadow(0 4px 12px rgba(0,0,0,0.4))}
+.fab-alert svg{width:56px;height:56px}
+.light .fab-alert{filter:drop-shadow(0 3px 8px rgba(0,0,0,0.2))}
 
 /* ── VELOCÍMETRO ── */
 .speedometer{position:fixed;bottom:185px;left:14px;z-index:800;width:72px;height:72px;cursor:default;border-radius:50%;overflow:hidden;transition:bottom .3s cubic-bezier(.4,0,.2,1),transform .18s ease}
@@ -165,6 +165,11 @@ body.light{background:#e8e0d5}
 .light #fabTheme svg{fill:#222}
 .light .search-panel,.light .nav-panel{background:rgba(255,255,255,0.97)}
 .light .sh,.light .nav-row .sh{background:rgba(0,0,0,0.1)}
+.light .nav-cancel{background:rgba(0,0,0,0.06);color:#555}
+.light .nav-recenter{background:rgba(0,0,0,0.06)}
+.light .nav-arrival{color:#222}
+.light .nav-details{color:#888}
+.light .nav-dot{color:#ccc}
 .light .search-row{background:rgba(0,0,0,0.04);border-color:rgba(0,0,0,0.06)}
 .light .search-input{color:#222}
 .light .search-input::placeholder{color:rgba(0,0,0,0.35)}
@@ -182,6 +187,7 @@ body.light{background:#e8e0d5}
 .light .nav-details{color:#888}
 .light .nav-top{background:#f0f0f0}
 .light .nav-top-dist,.light .nav-top-street{color:#222}
+.light .nav-top-close{background:rgba(0,0,0,0.08);color:#555}
 </style>
 </head>
 <body>
@@ -206,10 +212,18 @@ body.light{background:#e8e0d5}
 </div>
 
 <div class="fab-alert" onclick="reportAlert()">
-  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" fill="#f5a623" stroke="#e8940a" stroke-width="0.5"/>
-    <line x1="12" y1="9" x2="12" y2="13" stroke="#1a1a1a" stroke-width="2.2" stroke-linecap="round"/>
-    <circle cx="12" cy="17" r="1" fill="#1a1a1a"/>
+  <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <!-- Sombra -->
+    <path d="M30.2 6L4 54a4 4 0 003.5 6h49a4 4 0 003.5-6L34 6a4 4 0 00-3.8 0z" fill="rgba(0,0,0,0.15)" transform="translate(1,2)"/>
+    <!-- Borde oscuro -->
+    <path d="M30.2 6L4 54a4 4 0 003.5 6h49a4 4 0 003.5-6L34 6a4 4 0 00-3.8 0z" fill="#c67800" stroke="#8B5A00" stroke-width="1"/>
+    <!-- Cuerpo amarillo -->
+    <path d="M30.8 9L7 53a3 3 0 002.6 4.5h44.8a3 3 0 002.6-4.5L33.2 9a3 3 0 00-2.4 0z" fill="#FFB800"/>
+    <!-- Brillo superior -->
+    <path d="M31 12L10 50h22z" fill="rgba(255,255,255,0.2)"/>
+    <!-- Signo de exclamación -->
+    <rect x="29.5" y="22" width="5" height="18" rx="2.5" fill="#333"/>
+    <circle cx="32" cy="47" r="3" fill="#333"/>
   </svg>
 </div>
 
@@ -455,7 +469,7 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
     }).addTo(map);
     accuracyCircle=L.circle([lat,lng],{radius:Math.min(accuracy||20,120),fillColor:'rgba(0,188,212,0.06)',fillOpacity:1,color:'rgba(0,188,212,0.2)',weight:1}).addTo(map);
     // Primer fix: centrar en posición con offset correcto
-    map.setView(getOffsetCenter(lat,lng),17);
+    map.setView(getOffsetCenter(lat,lng),18);
   } else {
     userMarker.setLatLng([lat,lng]);
     accuracyCircle.setLatLng([lat,lng]).setRadius(Math.min(accuracy||20,120));
@@ -482,7 +496,7 @@ function recenter(){
   if(!userLat)return;
   setMapBearing(-curH);
   // Centrar suavemente como Waze
-  map.flyTo(getOffsetCenter(userLat,userLng),17,{duration:0.4});
+  map.flyTo(getOffsetCenter(userLat,userLng),18,{duration:0.4});
 }
 function centerOnUser(){recenter();}
 function onSpeedometerClick(){if(!isFollowing)recenter();}
@@ -683,7 +697,7 @@ function renderResults(items){
   el.innerHTML=items.map(c=>`<div class="result-row" onclick="selectClient('${c.id}')"><div class="rpin">📍</div><div class="rinfo"><div class="rname">${c.nombre}</div><div class="rsub">${c.direccion||c.zona||c.codigo||''}</div></div><div class="rdist">${c.dist<1?Math.round(c.dist*1000)+'m':c.dist.toFixed(1)+'km'}</div></div>`).join('');
 }
 function collapseSearch(){collapseSearchPanel();}
-function selectClient(id){const c=allClients.find(x=>x.id===id);if(!c)return;collapseSearchPanel();isFollowing=false;map.flyTo([c.lat,c.lng],17,{duration:0.5});setTimeout(()=>showClientPopup(c),350);}
+function selectClient(id){const c=allClients.find(x=>x.id===id);if(!c)return;collapseSearchPanel();isFollowing=false;map.flyTo([c.lat,c.lng],18,{duration:0.5});setTimeout(()=>showClientPopup(c),350);}
 function showClientPopup(c){
   selectedClient=c;
   document.getElementById('popupName').textContent=c.nombre||'Cliente';
