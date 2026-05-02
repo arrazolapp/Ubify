@@ -6,7 +6,7 @@
 <title></title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;--bearing:0deg}
 .leaflet-map-pane,.leaflet-tile-pane,.leaflet-tile{will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden}
 .leaflet-container{background:transparent !important}
 html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,'Segoe UI',system-ui,sans-serif}
@@ -23,6 +23,8 @@ body.light #map{background:#f2ede3}
 .nav-wrap img{background:transparent!important;border:none!important;outline:none!important}
 .leaflet-div-icon{background:transparent!important;border:none!important}
 .leaflet-marker-icon{background:transparent!important;border:none!important}
+.client-pin{background:transparent!important;border:none!important}
+.client-pin svg{transition:transform 0.3s ease;transform:rotate(var(--bearing, 0deg))}
 .nav-wrap svg,.nav-wrap img{transition:transform 0.3s ease;transform-origin:50% 50%}
 .nav-glow{position:absolute;inset:-14px;border-radius:50%;background:radial-gradient(circle,rgba(0,188,212,0.22) 0%,transparent 65%);animation:glow 2s ease-in-out infinite;pointer-events:none}
 @keyframes glow{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.9;transform:scale(1.3)}}
@@ -456,7 +458,7 @@ const TILES={
   dark:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
   light:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
 };
-let tileLayer=L.tileLayer(TILES.dark,{maxZoom:19,keepBuffer:12,updateWhenIdle:false,updateWhenZooming:true,crossOrigin:true}).addTo(map);
+let tileLayer=L.tileLayer(TILES.dark,{maxZoom:20,keepBuffer:12,updateWhenIdle:false,updateWhenZooming:true,crossOrigin:true}).addTo(map);
 
 function toggleTheme(){
   isDark=!isDark;
@@ -532,6 +534,8 @@ function setMapBearing(deg){
   if(!w) return;
   updateBearingOrigin();
   w.style.transform=`rotate(${deg}deg)`;
+  // Set CSS variable for counter-rotation of pins
+  document.documentElement.style.setProperty('--bearing', `${-deg}deg`);
   clearTimeout(window._invTimer);
   window._invTimer=setTimeout(()=>{try{map.invalidateSize({pan:false});}catch(e){}},400);
 }
@@ -551,7 +555,7 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
     userMarker.on('click', function(){ openCursorPicker(); });
     accuracyCircle=L.circle([lat,lng],{radius:Math.min(accuracy||20,120),fillColor:'rgba(0,188,212,0.06)',fillOpacity:1,color:'rgba(0,188,212,0.2)',weight:1}).addTo(map);
     // Primer fix: centrar en posición con offset correcto
-    map.setView(getOffsetCenter(lat,lng),19);
+    map.setView(getOffsetCenter(lat,lng),20);
   } else {
     userMarker.setLatLng([lat,lng]);
     accuracyCircle.setLatLng([lat,lng]).setRadius(Math.min(accuracy||20,120));
@@ -578,7 +582,7 @@ function recenter(){
   if(!userLat)return;
   setMapBearing(-curH);
   // Centrar suavemente como Waze
-  map.flyTo(getOffsetCenter(userLat,userLng),19,{duration:0.4});
+  map.flyTo(getOffsetCenter(userLat,userLng),20,{duration:0.4});
 }
 function centerOnUser(){recenter();}
 function onSpeedometerClick(){if(!isFollowing)recenter();}
@@ -608,7 +612,7 @@ function initFirebase(){
       if(!lat||!lng)return;
       const norm={id,lat,lng,nombre:c.nombre||c.Nombre||'Cliente',codigo:c.codigo||'',telefono:c.telefono||'',direccion:c.direccion||'',zona:c.zona||''};
       allClients.push(norm);
-      const pin=L.divIcon({className:'',html:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 80" width="16" height="21"><path d="M30 2C16 2 5 13 5 27c0 18 25 51 25 51S55 45 55 27C55 13 44 2 30 2z" fill="#f56a00" stroke="white" stroke-width="3"/><circle cx="30" cy="27" r="9" fill="white" opacity="0.85"/></svg>`,iconSize:[16,21],iconAnchor:[8,21]});
+      const pin=L.divIcon({className:'client-pin',html:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 80" width="16" height="21"><path d="M30 2C16 2 5 13 5 27c0 18 25 51 25 51S55 45 55 27C55 13 44 2 30 2z" fill="#f56a00" stroke="white" stroke-width="3"/><circle cx="30" cy="27" r="9" fill="white" opacity="0.85"/></svg>`,iconSize:[16,21],iconAnchor:[8,21]});
       const mk=L.marker([lat,lng],{icon:pin}).addTo(map);
       mk.on('click',e=>{L.DomEvent.stop(e);showClientPopup(norm);});
       clientMarkers[id]=mk;
@@ -936,7 +940,7 @@ function startActiveNav(){
   document.getElementById('searchPanel').style.display='none'; // Solo ocultar búsqueda
   document.getElementById('navPanel').classList.add('active');
   isFollowing=true;
-  map.flyTo(getOffsetCenter(userLat,userLng),19,{duration:0.8});
+  map.flyTo(getOffsetCenter(userLat,userLng),20,{duration:0.8});
   updateNavInfo();
 }
 function updateNavInfo(){
