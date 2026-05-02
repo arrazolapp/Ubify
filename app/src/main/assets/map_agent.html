@@ -10,9 +10,12 @@
 .leaflet-map-pane,.leaflet-tile-pane,.leaflet-tile{will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden}
 .leaflet-container{background:transparent !important}
 html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,'Segoe UI',system-ui,sans-serif}
-body{background:#1b2433}
-#map{position:fixed;inset:0;z-index:0;background:#1a1a2e}
-body.light #map{background:#e8e0d5}
+body{background:#2b3648}
+.leaflet-container{background:#2b3648 !important}
+body.light{background:#f2ede3}
+body.light .leaflet-container{background:#f2ede3 !important}
+#map{position:fixed;inset:0;z-index:0;background:#2b3648}
+body.light #map{background:#f2ede3}
 .leaflet-control-zoom,.leaflet-control-attribution{display:none!important}
 
 /* ── CURSOR ── */
@@ -453,7 +456,7 @@ const TILES={
   dark:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
   light:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
 };
-let tileLayer=L.tileLayer(TILES.dark,{maxZoom:19,keepBuffer:8,updateWhenIdle:false,updateWhenZooming:true,crossOrigin:true}).addTo(map);
+let tileLayer=L.tileLayer(TILES.dark,{maxZoom:19,keepBuffer:12,updateWhenIdle:false,updateWhenZooming:true,crossOrigin:true}).addTo(map);
 
 function toggleTheme(){
   isDark=!isDark;
@@ -519,7 +522,7 @@ function ensureBearingWrap(){
   const pane=document.querySelector('#map .leaflet-map-pane');
   if(!pane)return null;
   _bWrap=document.createElement('div');
-  _bWrap.style.cssText='position:absolute;inset:0;transform-origin:50% 50%;will-change:transform;transition:transform 0.35s ease;';
+  _bWrap.style.cssText='position:absolute;inset:0;will-change:transform;transition:transform 0.35s ease;';
   pane.parentNode.insertBefore(_bWrap,pane);
   _bWrap.appendChild(pane);
   return _bWrap;
@@ -527,8 +530,10 @@ function ensureBearingWrap(){
 function setMapBearing(deg){
   const w=ensureBearingWrap();
   if(!w) return;
-  updateBearingOrigin(); // Rotar alrededor de la posición del cursor
+  updateBearingOrigin();
   w.style.transform=`rotate(${deg}deg)`;
+  clearTimeout(window._invTimer);
+  window._invTimer=setTimeout(()=>{try{map.invalidateSize({pan:false});}catch(e){}},400);
 }
 
 function updateUserPosition(lat,lng,accuracy,speed,hdg){
@@ -928,7 +933,7 @@ function startActiveNav(){
   document.getElementById('routeSheet').classList.remove('active');
   document.getElementById('navTop').classList.add('active');
   collapseSearchPanel();
-  document.getElementById('bottomBar').style.display='none'; // Ocultar barra de búsqueda
+  document.getElementById('searchPanel').style.display='none'; // Solo ocultar búsqueda
   document.getElementById('navPanel').classList.add('active');
   isFollowing=true;
   map.flyTo(getOffsetCenter(userLat,userLng),19,{duration:0.8});
@@ -954,8 +959,7 @@ function stopNavigation(){
   document.getElementById('navTop').classList.remove('active');
   document.getElementById('navPanel').classList.remove('active');
   document.getElementById('routeSheet').classList.remove('active');
-  document.getElementById('bottomBar').style.display=''; // Mostrar barra de búsqueda
-  document.getElementById('searchPanel').style.display='';
+  document.getElementById('searchPanel').style.display=''; // Mostrar búsqueda
   isFollowing=true;recenter();
 }
 
