@@ -24,8 +24,8 @@ body.light #map{background:#f2ede3}
 .leaflet-div-icon{background:transparent!important;border:none!important}
 .leaflet-marker-icon{background:transparent!important;border:none!important}
 .client-pin{background:transparent!important;border:none!important}
-.client-pin svg{transition:transform 0.3s ease;transform:rotate(var(--bearing, 0deg))}
-.nav-wrap svg,.nav-wrap img{transition:transform 0.3s ease;transform-origin:50% 50%}
+.client-pin svg{transition:transform 0.1s ease;transform:rotate(var(--bearing, 0deg))}
+.nav-wrap svg,.nav-wrap img{transition:transform 0.1s ease;transform-origin:50% 50%}
 .nav-glow{position:absolute;inset:-14px;border-radius:50%;background:radial-gradient(circle,rgba(0,188,212,0.22) 0%,transparent 65%);animation:glow 2s ease-in-out infinite;pointer-events:none}
 @keyframes glow{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.9;transform:scale(1.3)}}
 
@@ -455,18 +455,43 @@ document.addEventListener('DOMContentLoaded',()=>buildTacho());
 
 let isDark=true;
 const TILES={
-  dark:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  light:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+  dark:'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+  dark_labels:'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+  light:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',
+  light_labels:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png'
 };
+// Create custom pane for labels (higher z-index so labels appear on top)
+map.createPane('labelsPane');
+map.getPane('labelsPane').style.zIndex=450;
+map.getPane('labelsPane').style.pointerEvents='none';
+
 let tileLayer=L.tileLayer(TILES.dark,{maxZoom:20,keepBuffer:12,updateWhenIdle:false,updateWhenZooming:true,crossOrigin:true}).addTo(map);
+let labelsLayer=L.tileLayer(TILES.dark_labels,{maxZoom:20,keepBuffer:12,updateWhenIdle:false,updateWhenZooming:true,crossOrigin:true,pane:'labelsPane'}).addTo(map);
 
 function toggleTheme(){
   isDark=!isDark;
   tileLayer.setUrl(isDark?TILES.dark:TILES.light);
+  labelsLayer.setUrl(isDark?TILES.dark_labels:TILES.light_labels);
   document.body.className=isDark?'':'light';
   const btn=document.getElementById('fabTheme');
   if(btn) btn.textContent=isDark?'🌙':'☀️';
 }
+
+// ═══ PANTALLA SIEMPRE ENCENDIDA ═══
+let wakeLock=null;
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator){
+      wakeLock=await navigator.wakeLock.request('screen');
+      console.log('WakeLock activo');
+    }
+  }catch(e){console.log('WakeLock no disponible');}
+}
+requestWakeLock();
+// Re-acquire on visibility change (when user returns to app)
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible') requestWakeLock();
+});
 
 // ═══ CURSOR + NORTE FIJO ═══
 let userMarker=null,accuracyCircle=null;
@@ -524,7 +549,7 @@ function ensureBearingWrap(){
   const pane=document.querySelector('#map .leaflet-map-pane');
   if(!pane)return null;
   _bWrap=document.createElement('div');
-  _bWrap.style.cssText='position:absolute;inset:0;will-change:transform;transition:transform 0.35s ease;';
+  _bWrap.style.cssText='position:absolute;inset:0;will-change:transform;transition:transform 0.1s ease;';
   pane.parentNode.insertBefore(_bWrap,pane);
   _bWrap.appendChild(pane);
   return _bWrap;
@@ -534,17 +559,36 @@ function setMapBearing(deg){
   if(!w) return;
   updateBearingOrigin();
   w.style.transform=`rotate(${deg}deg)`;
-  // Set CSS variable for counter-rotation of pins
+  // Counter-rotate labels pane so street names stay readable
+  // Must use same transform-origin as the bearing wrap
+  const labelsPane=map.getPane('labelsPane');
+  if(labelsPane){
+    const mapH=map.getContainer().offsetHeight;
+    const mapW=map.getContainer().offsetWidth;
+    const cursorY=mapH - 185 - 36;
+    const cursorX=mapW/2;
+    labelsPane.style.transformOrigin=`${cursorX}px ${cursorY}px`;
+    labelsPane.style.transform=`rotate(${-deg}deg)`;
+    labelsPane.style.transition='transform 0.1s ease';
+  }
+  // Counter-rotate client pins via CSS variable
   document.documentElement.style.setProperty('--bearing', `${-deg}deg`);
   clearTimeout(window._invTimer);
   window._invTimer=setTimeout(()=>{try{map.invalidateSize({pan:false});}catch(e){}},400);
 }
 
 function updateUserPosition(lat,lng,accuracy,speed,hdg){
-  userLat=lat;userLng=lng;
   const kmh=speed?Math.round(Math.abs(speed)*3.6):0;
   document.getElementById('speedVal').textContent=kmh;
   updateTacho(kmh);
+
+  // ═══ DEAD ZONE: No mover el cursor si estamos quietos (< 3m de cambio y < 3 km/h) ═══
+  if(userLat && userLng && kmh < 3){
+    const moveDist=hav(userLat,userLng,lat,lng)*1000; // metros
+    if(moveDist < 3) return; // Ignorar micro-movimientos del GPS
+  }
+
+  userLat=lat;userLng=lng;
   if(hdg!=null&&kmh>3){smoothH=lerpAngle(smoothH,hdg,0.18);curH=smoothH;}
 
   if(!userMarker){
@@ -554,23 +598,19 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
     }).addTo(map);
     userMarker.on('click', function(){ openCursorPicker(); });
     accuracyCircle=L.circle([lat,lng],{radius:Math.min(accuracy||20,120),fillColor:'rgba(0,188,212,0.06)',fillOpacity:1,color:'rgba(0,188,212,0.2)',weight:1}).addTo(map);
-    // Primer fix: centrar en posición con offset correcto
     map.setView(getOffsetCenter(lat,lng),20);
   } else {
     userMarker.setLatLng([lat,lng]);
     accuracyCircle.setLatLng([lat,lng]).setRadius(Math.min(accuracy||20,120));
   }
 
-  // SIEMPRE: Mapa rota según dirección, cursor SIEMPRE apunta ARRIBA
   if(isFollowing && kmh > 2){
     setMapBearing(-curH);
   }
-  // Contra-rotar el SVG del cursor para que SIEMPRE apunte arriba
   const cEl=document.querySelector('.nav-wrap svg, .nav-wrap img');
   if(cEl) cEl.style.transform=`rotate(${curH}deg)`;
 
   if(isFollowing&&userLat){
-    // Animación rápida para seguimiento suave (0.3s en vez de 0.5s)
     map.panTo(getOffsetCenter(lat,lng),{animate:true,duration:0.3,easeLinearity:0.3,noMoveStart:true});
   }
   if(navActive&&navTarget)updateNavInfo();
@@ -817,7 +857,7 @@ function startRoutePreview(){
   if(routeLine){map.removeLayer(routeLine);routeLine=null;}
   if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
 
-  map.flyToBounds(L.latLngBounds([[userLat,userLng],[navTarget.lat,navTarget.lng]]),{padding:[80,120],duration:0.8});
+  map.flyToBounds(L.latLngBounds([[userLat,userLng],[navTarget.lat,navTarget.lng]]),{padding:[80,120],duration:0.8,maxZoom:17});
   fetchRoute();
 }
 function cancelRoute(){
@@ -903,7 +943,7 @@ function onRouteResult(data){
   routeLine=L.polyline(coords,{color:'#7B2FBE',weight:7,opacity:0.9,lineJoin:'round',lineCap:'round'}).addTo(map);
   console.log('Route drawn successfully');
 
-  map.flyToBounds(L.latLngBounds(coords),{padding:[60,100],duration:0.8});
+  map.flyToBounds(L.latLngBounds(coords),{padding:[60,100],duration:0.8,maxZoom:17});
 
   const km=route.distance/1000,min=Math.round(route.duration/60);
   document.getElementById('routeEta').textContent=`${min} min`;
@@ -937,10 +977,15 @@ function startActiveNav(){
   document.getElementById('routeSheet').classList.remove('active');
   document.getElementById('navTop').classList.add('active');
   collapseSearchPanel();
-  document.getElementById('searchPanel').style.display='none'; // Solo ocultar búsqueda
+  document.getElementById('searchPanel').style.display='none';
   document.getElementById('navPanel').classList.add('active');
   isFollowing=true;
-  map.flyTo(getOffsetCenter(userLat,userLng),20,{duration:0.8});
+
+  // FORZAR zoom cercano
+  map.setView(getOffsetCenter(userLat,userLng),20,{animate:false});
+  setTimeout(()=>{
+    map.setView(getOffsetCenter(userLat,userLng),20,{animate:true,duration:0.5});
+  },300);
   updateNavInfo();
 }
 function updateNavInfo(){
@@ -963,7 +1008,7 @@ function stopNavigation(){
   document.getElementById('navTop').classList.remove('active');
   document.getElementById('navPanel').classList.remove('active');
   document.getElementById('routeSheet').classList.remove('active');
-  document.getElementById('searchPanel').style.display=''; // Mostrar búsqueda
+  document.getElementById('searchPanel').style.display='';
   isFollowing=true;recenter();
 }
 
