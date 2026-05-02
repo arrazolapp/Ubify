@@ -456,7 +456,7 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
   const kmh=speed?Math.round(Math.abs(speed)*3.6):0;
   document.getElementById('speedVal').textContent=kmh;
   updateTacho(kmh);
-  if(hdg!=null&&kmh>3){smoothH=lerpAngle(smoothH,hdg,0.18);curH=smoothH;}
+  if(hdg!=null&&kmh>3){smoothH=lerpAngle(smoothH,hdg,0.75);curH=smoothH;}
 
   if(!userMarker){
     userMarker=L.marker([lat,lng],{
@@ -884,4 +884,5 @@ setTimeout(()=>{if(!USER_ID)initFirebase();},1500);
 </script>
 </body>
 </html>
+
 
