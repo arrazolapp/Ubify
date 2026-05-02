@@ -342,18 +342,6 @@ body.light{background:#e8e0d5}
 <script>
 // ═══ CONFIG ═══
 let COMPANY_ID='demo_corp', USER_ID='', userName='Agente';
-
-// ── POSICIÓN DEL CURSOR EN PANTALLA ──────────────────────
-// Ajustá estos dos valores para mover el cursor:
-//   CURSOR_OFFSET_Y: píxeles desde abajo de la barra inferior
-//                    + número = cursor más ARRIBA
-//                    - número = cursor más ABAJO (puede quedar detrás de la barra)
-//   CURSOR_OFFSET_X: píxeles desde el centro horizontal
-//                    + número = cursor más a la DERECHA
-//                    - número = cursor más a la IZQUIERDA
-const CURSOR_OFFSET_Y = 90;   // <-- cambiá este valor
-const CURSOR_OFFSET_X = 0;    // <-- cambiá este valor
-// ─────────────────────────────────────────────────────────
 function setConfig(c,u,n){COMPANY_ID=c;USER_ID=u;userName=n;document.getElementById('menuUser').textContent=n;initFirebase();}
 
 firebase.initializeApp({
@@ -441,14 +429,16 @@ function ensureBearingWrap(){
   const pane=document.querySelector('#map .leaflet-map-pane');
   if(!pane)return null;
   _bWrap=document.createElement('div');
-  _bWrap.style.cssText='position:absolute;inset:0;transform-origin:50% 50%;will-change:transform;transition:transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94);';
+  _bWrap.style.cssText='position:absolute;inset:0;transform-origin:50% 50%;will-change:transform;transition:transform 0.35s ease;';
   pane.parentNode.insertBefore(_bWrap,pane);
   _bWrap.appendChild(pane);
   return _bWrap;
 }
 function setMapBearing(deg){
   const w=ensureBearingWrap();
-  if(w) w.style.transform=`rotate(${deg}deg)`;
+  if(!w) return;
+  updateBearingOrigin(); // Rotar alrededor de la posición del cursor
+  w.style.transform=`rotate(${deg}deg)`;
 }
 
 function updateUserPosition(lat,lng,accuracy,speed,hdg){
@@ -456,7 +446,7 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
   const kmh=speed?Math.round(Math.abs(speed)*3.6):0;
   document.getElementById('speedVal').textContent=kmh;
   updateTacho(kmh);
-  if(hdg!=null&&kmh>3){smoothH=lerpAngle(smoothH,hdg,0.75);curH=smoothH;}
+  if(hdg!=null&&kmh>3){smoothH=lerpAngle(smoothH,hdg,0.18);curH=smoothH;}
 
   if(!userMarker){
     userMarker=L.marker([lat,lng],{
@@ -464,11 +454,13 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
       zIndexOffset:1000,interactive:false
     }).addTo(map);
     accuracyCircle=L.circle([lat,lng],{radius:Math.min(accuracy||20,120),fillColor:'rgba(0,188,212,0.06)',fillOpacity:1,color:'rgba(0,188,212,0.2)',weight:1}).addTo(map);
-    map.setView([lat,lng],17);
+    // Primer fix: centrar en posición con offset correcto
+    map.setView(getOffsetCenter(lat,lng),17);
   } else {
     userMarker.setLatLng([lat,lng]);
     accuracyCircle.setLatLng([lat,lng]).setRadius(Math.min(accuracy||20,120));
   }
+
   // SIEMPRE: Mapa rota según dirección, cursor SIEMPRE apunta ARRIBA
   if(isFollowing && kmh > 2){
     setMapBearing(-curH);
@@ -478,7 +470,8 @@ function updateUserPosition(lat,lng,accuracy,speed,hdg){
   if(cEl) cEl.style.transform=`rotate(${curH}deg)`;
 
   if(isFollowing&&userLat){
-    map.panTo(getOffsetCenter(lat,lng),{animate:true,duration:0.5,easeLinearity:0.5,noMoveStart:true});
+    // Animación rápida para seguimiento suave (0.3s en vez de 0.5s)
+    map.panTo(getOffsetCenter(lat,lng),{animate:true,duration:0.3,easeLinearity:0.3,noMoveStart:true});
   }
   if(navActive&&navTarget)updateNavInfo();
 }
@@ -487,14 +480,9 @@ function recenter(){
   isFollowing=true;
   document.getElementById('speedometer').classList.remove('recenter-mode');
   if(!userLat)return;
-  // Restaurar bearing con transición suave del wrapper
   setMapBearing(-curH);
-  // flyTo suave al offset correcto — animación 0.7s como Waze
-  map.flyTo(getOffsetCenter(userLat,userLng),map.getZoom(),{
-    duration:0.7,
-    easeLinearity:0.5,
-    noMoveStart:true
-  });
+  // Centrar suavemente como Waze
+  map.flyTo(getOffsetCenter(userLat,userLng),17,{duration:0.4});
 }
 function centerOnUser(){recenter();}
 function onSpeedometerClick(){if(!isFollowing)recenter();}
@@ -630,7 +618,7 @@ function showPill(msg){
 function hidePill(){document.getElementById('proxPill').classList.remove('visible');}
 function dismissProxPill(){proxDismissed=true;hidePill();}
 
-// ═══ ÍCONOS FLOTANTES (solo mover botones, NUNCA el mapa) ═══
+// ═══ ÍCONOS FLOTANTES + REENCUADRE DEL MAPA ═══
 function updateFloatingButtons(){
   const bar=document.getElementById('bottomBar');
   const barH=bar?bar.offsetHeight:0;
@@ -642,23 +630,40 @@ function updateFloatingButtons(){
   if(popup&&popup.classList.contains('visible')){
     popup.style.bottom=(barH+8)+'px';
   }
-  // NO mover el mapa aquí — eso lo hace updateUserPosition en cada GPS update
+  // Reencuadrar el mapa para que el cursor no quede detrás de la barra
+  if(isFollowing&&userLat&&map.getContainer()){
+    map.panTo(getOffsetCenter(userLat,userLng),{animate:true,duration:0.35,easeLinearity:0.5,noMoveStart:true});
+  }
 }
 
-// Helper: cursor a la posición exacta definida por CURSOR_OFFSET_X/Y
+// Helper: calcula la LatLng objetivo para que el cursor quede
+// al mismo nivel vertical que el velocímetro/alerta, centrado horizontal
 function getOffsetCenter(lat,lng){
-  const bar=document.getElementById('bottomBar');
-  const barH=bar?bar.offsetHeight:0;
-  const mapW=map.getContainer().offsetWidth;
   const mapH=map.getContainer().offsetHeight;
-  // Posición objetivo del cursor en pantalla
-  const targetX=mapW/2 + CURSOR_OFFSET_X;          // centro horizontal + offset X
-  const targetY=mapH - barH - CURSOR_OFFSET_Y;      // desde abajo: barra + offset Y
-  const cursorPt=map.latLngToContainerPoint([lat,lng]);
-  const dx=cursorPt.x - targetX;  // cuántos px mover horizontalmente
-  const dy=cursorPt.y - targetY;  // cuántos px mover verticalmente
+  // Posición del cursor: mismo nivel que speedometer (bottom ~185px + 36px mitad icono)
+  const targetY=mapH - 185 - 36;
+  // Centro horizontal
+  const targetX=map.getContainer().offsetWidth/2;
+  
+  // Mover el centro del mapa para que [lat,lng] quede en (targetX, targetY)
+  const currentPt=map.latLngToContainerPoint([lat,lng]);
   const centerPt=map.latLngToContainerPoint(map.getCenter());
-  return map.containerPointToLatLng(L.point(centerPt.x+dx, centerPt.y+dy));
+  return map.containerPointToLatLng(L.point(
+    centerPt.x + (currentPt.x - targetX),
+    centerPt.y + (currentPt.y - targetY)
+  ));
+}
+
+// Actualizar el transform-origin del bearing wrap para que rote
+// alrededor de la posición del cursor (no del centro de la pantalla)
+function updateBearingOrigin(){
+  const w=ensureBearingWrap();
+  if(!w)return;
+  const mapH=map.getContainer().offsetHeight;
+  const mapW=map.getContainer().offsetWidth;
+  const cursorY=mapH - 185 - 36;
+  const cursorX=mapW/2;
+  w.style.transformOrigin=`${cursorX}px ${cursorY}px`;
 }
 // Observer para detectar cambios de altura en la barra
 const _barObs=new ResizeObserver(()=>updateFloatingButtons());
@@ -666,7 +671,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   const bar=document.getElementById('bottomBar');
   if(bar)_barObs.observe(bar);
   updateFloatingButtons();
+  updateBearingOrigin();
 });
+// Actualizar origin al redimensionar pantalla
+window.addEventListener('resize',()=>{ updateBearingOrigin(); updateFloatingButtons(); });
 // Cerrar panel al tocar el mapa
 
 function renderResults(items){
@@ -831,13 +839,7 @@ function startActiveNav(){
   collapseSearchPanel();
   document.getElementById('navPanel').classList.add('active');
   isFollowing=true;
-  // Aplicar bearing y subir zoom sin resetear la rotación
-  setMapBearing(-curH);
-  map.flyTo(getOffsetCenter(userLat,userLng),18,{
-    duration:0.8,
-    easeLinearity:0.4,
-    noMoveStart:true
-  });
+  map.flyTo([userLat,userLng],18,{duration:0.8});
   updateNavInfo();
 }
 function updateNavInfo(){
@@ -884,5 +886,3 @@ setTimeout(()=>{if(!USER_ID)initFirebase();},1500);
 </script>
 </body>
 </html>
-
-
