@@ -26,20 +26,6 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
-    <!-- Visibilidad de apps externas (Android 11+) -->
-    <queries>
-        <package android:name="com.waze" />
-        <package android:name="com.google.android.apps.maps" />
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="waze" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="geo" />
-        </intent>
-    </queries>
-
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -49,24 +35,17 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
 
-        <!-- ── SPLASH — punto de entrada de la app ── -->
-        <activity
-            android:name=".SplashActivity"
-            android:exported="true"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.Splash">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-
-        <!-- ── MAIN — pantalla principal ── -->
+        <!-- ══ APP 1: Ubify GPS Tracker ══ -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="portrait"
-            android:launchMode="singleTop">
+            android:launchMode="singleTop"
+            android:label="Ubify GPS">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
             <!-- Deep link para abrir desde el link del admin -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -76,17 +55,38 @@
             </intent-filter>
         </activity>
 
-        <!-- ── SETUP — configuración inicial ── -->
+        <!-- Pantalla de configuración inicial del tracker -->
         <activity
             android:name=".SetupActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
 
-        <!-- ── MAPA — con clientes (WebView) ── -->
+        <!-- Mapa con clientes del tracker (WebView) -->
         <activity
             android:name=".MapActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
+
+        <!-- ══ APP 2: Ubify Navegación (standalone) ══ -->
+        <activity
+            android:name=".NavActivity"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:launchMode="singleTop"
+            android:label="Ubify Nav">
+            <!-- Aparece como ícono separado en el launcher del celular -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Deep link propio: ubifynavapp://open -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="arrazolapp" android:host="nav" />
+            </intent-filter>
+        </activity>
 
         <!-- Servicio de tracking GPS en foreground -->
         <service
