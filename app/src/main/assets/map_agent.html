@@ -846,24 +846,22 @@ function closePopup(){document.getElementById('clientPopup').classList.remove('v
 
 // ═══ WAZE / GMAPS ═══
 function openWaze(){
-  if(!selectedClient)return;closePopup();
-  if(window.Android?.openWaze){window.Android.openWaze(selectedClient.lat,selectedClient.lng);return;}
+  if(!selectedClient)return;
+  // Guardar coords ANTES de closePopup (que pone selectedClient=null)
   const lat=selectedClient.lat,lng=selectedClient.lng;
-  // Deep link: intenta abrir app Waze, fallback a web
-  const iframe=document.createElement('iframe');iframe.style.display='none';
-  iframe.src=`waze://?ll=${lat},${lng}&navigate=yes`;
-  document.body.appendChild(iframe);
-  setTimeout(()=>{document.body.removeChild(iframe);location.href=`https://waze.com/ul?ll=${lat},${lng}&navigate=yes&zoom=17`;},1500);
+  closePopup();
+  if(window.Android?.openWaze){window.Android.openWaze(lat,lng);return;}
+  // Fallback web (navegador externo via location.href)
+  location.href=`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
 }
 function openGoogleMaps(){
-  if(!selectedClient)return;closePopup();
-  if(window.Android?.openGoogleMaps){window.Android.openGoogleMaps(selectedClient.lat,selectedClient.lng);return;}
+  if(!selectedClient)return;
+  // Guardar coords ANTES de closePopup (que pone selectedClient=null)
   const lat=selectedClient.lat,lng=selectedClient.lng;
-  // geo: URI lanza el selector de apps de mapas en Android
-  const iframe=document.createElement('iframe');iframe.style.display='none';
-  iframe.src=`geo:${lat},${lng}?q=${lat},${lng}(${encodeURIComponent(selectedClient.nombre||'Destino')})`;
-  document.body.appendChild(iframe);
-  setTimeout(()=>{document.body.removeChild(iframe);location.href=`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;},1500);
+  closePopup();
+  if(window.Android?.openGoogleMaps){window.Android.openGoogleMaps(lat,lng);return;}
+  // Fallback web
+  location.href=`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 }
 
 // ═══ RUTA ═══
@@ -1103,4 +1101,3 @@ setTimeout(()=>{if(!USER_ID)initFirebase();},1500);
 </script>
 </body>
 </html>
-
