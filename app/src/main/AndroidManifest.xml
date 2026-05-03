@@ -74,8 +74,7 @@
             android:screenOrientation="portrait"
             android:launchMode="singleTop"
             android:label="Ubeefy"
-            android:icon="@mipmap/ic_launcher_nav"
-            android:roundIcon="@mipmap/ic_launcher_nav_round">
+            android:icon="@mipmap/ic_launcher_nav">
             <!-- Aparece como ícono separado en el launcher del celular -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
