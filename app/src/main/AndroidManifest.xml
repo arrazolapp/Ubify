@@ -49,16 +49,24 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
 
-        <!-- Pantalla principal -->
+        <!-- ── SPLASH — punto de entrada de la app ── -->
+        <activity
+            android:name=".SplashActivity"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Splash">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ── MAIN — pantalla principal ── -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="portrait"
             android:launchMode="singleTop">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
             <!-- Deep link para abrir desde el link del admin -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -68,13 +76,13 @@
             </intent-filter>
         </activity>
 
-        <!-- Pantalla de configuración inicial -->
+        <!-- ── SETUP — configuración inicial ── -->
         <activity
             android:name=".SetupActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
 
-        <!-- Mapa con clientes (WebView) -->
+        <!-- ── MAPA — con clientes (WebView) ── -->
         <activity
             android:name=".MapActivity"
             android:exported="false"
