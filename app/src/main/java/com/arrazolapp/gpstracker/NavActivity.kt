@@ -48,7 +48,7 @@ class NavActivity : AppCompatActivity() {
                 // Pasar solo el company — esta versión no necesita userId de tracking
                 val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
                 val company = prefs.getString("company", "demo_corp") ?: "demo_corp"
-                val nombre  = prefs.getString("nombre", "Navigator") ?: "Navigator"
+                val nombre  = prefs.getString("nombre", "Ubeefy") ?: "Ubeefy"
                 // USER_ID vacío — la versión nav no lo necesita
                 webNav.evaluateJavascript("setConfig('$company','','$nombre')", null)
             }
