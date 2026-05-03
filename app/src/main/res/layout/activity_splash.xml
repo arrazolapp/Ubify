@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFC107">
+
+    <!-- "Ubeefy" — texto grande negro arriba de la abejita -->
+    <TextView
+        android:id="@+id/splashTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Ubeefy"
+        android:textSize="52sp"
+        android:textStyle="bold"
+        android:textColor="#1A1A1A"
+        android:fontFamily="sans-serif-black"
+        android:letterSpacing="-0.02"
+        app:layout_constraintBottom_toTopOf="@id/splashBee"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="4dp"/>
+
+    <!-- Abejita con ruedas — imagen principal -->
+    <!-- Usa @drawable/splash_bee si tenés la imagen full, o @mipmap/ic_launcher -->
+    <ImageView
+        android:id="@+id/splashBee"
+        android:layout_width="260dp"
+        android:layout_height="260dp"
+        android:src="@mipmap/ic_launcher"
+        android:scaleType="fitCenter"
+        android:contentDescription="Ubeefy bee"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintVertical_bias="0.46"/>
+
+    <!-- "from" pequeño sobre el logo de ArrazolApp -->
+    <TextView
+        android:id="@+id/splashFrom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="from"
+        android:textSize="13sp"
+        android:textColor="#7A5900"
+        android:fontFamily="sans-serif"
+        android:letterSpacing="0.05"
+        app:layout_constraintBottom_toTopOf="@id/splashBrand"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="2dp"/>
+
+    <!-- Logo "ArrazolApp" abajo -->
+    <!-- Si tenés el logo como imagen, cambiá por ImageView con @drawable/logo_arrazolapp -->
+    <TextView
+        android:id="@+id/splashBrand"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ArrazolApp"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="#5C3D00"
+        android:fontFamily="sans-serif-black"
+        android:letterSpacing="0.03"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="48dp"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
