@@ -89,16 +89,22 @@ class MapActivity : AppCompatActivity() {
             @JavascriptInterface
             fun openWaze(lat: Double, lng: Double) {
                 runOnUiThread {
-                    // Primero intentar abrir la app nativa de Waze
+                    // Intentar con package explícito (evita problema resolveActivity en Android 11+)
                     val wazeUri = Uri.parse("waze://?ll=$lat,$lng&navigate=yes")
-                    val wazeIntent = Intent(Intent.ACTION_VIEW, wazeUri)
-                    if (wazeIntent.resolveActivity(packageManager) != null) {
+                    val wazeIntent = Intent(Intent.ACTION_VIEW, wazeUri).apply {
+                        setPackage("com.waze")
+                    }
+                    try {
                         startActivity(wazeIntent)
-                    } else {
-                        // Si no tiene Waze, abrir en Play Store
-                        val playIntent = Intent(Intent.ACTION_VIEW,
-                            Uri.parse("market://details?id=com.waze"))
-                        startActivity(playIntent)
+                    } catch (e: Exception) {
+                        // Si falla con package explícito, intentar sin él
+                        try {
+                            startActivity(Intent(Intent.ACTION_VIEW, wazeUri))
+                        } catch (e2: Exception) {
+                            // Última opción: Play Store
+                            startActivity(Intent(Intent.ACTION_VIEW,
+                                Uri.parse("market://details?id=com.waze")))
+                        }
                     }
                 }
             }
