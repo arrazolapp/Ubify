@@ -19,7 +19,7 @@ class SplashActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Pantalla completa — sin barra de estado ni título
+        // Pantalla completa sin barra de estado
         window.setFlags(
             WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN
@@ -29,12 +29,11 @@ class SplashActivity : AppCompatActivity() {
         setContentView(R.layout.activity_splash)
 
         val imgBee   = findViewById<ImageView>(R.id.splashBee)
-        val txtTitle = findViewById<TextView>(R.id.splashTitle)   // "Ubeefy"
-        val txtFrom  = findViewById<TextView>(R.id.splashFrom)    // "from"
-        val txtBrand = findViewById<TextView>(R.id.splashBrand)   // "ArrazolApp"
+        val txtTitle = findViewById<TextView>(R.id.splashTitle)
+        val txtFrom  = findViewById<TextView>(R.id.splashFrom)
+        val txtBrand = findViewById<TextView>(R.id.splashBrand)
 
-        // ── 1. "Ubeefy" baja desde arriba con overshoot ───────────────────
-        txtTitle.alpha = 0f
+        // 1. "Ubeefy" baja desde arriba con overshoot
         val titleAnim = AnimationSet(true).apply {
             addAnimation(TranslateAnimation(
                 Animation.RELATIVE_TO_SELF, 0f, Animation.RELATIVE_TO_SELF, 0f,
@@ -45,8 +44,7 @@ class SplashActivity : AppCompatActivity() {
         }
         txtTitle.startAnimation(titleAnim)
 
-        // ── 2. Abejita sube desde abajo con rebote fuerte ─────────────────
-        imgBee.alpha = 0f
+        // 2. Abejita sube desde abajo con rebote
         val beeEnter = AnimationSet(true).apply {
             addAnimation(TranslateAnimation(
                 Animation.RELATIVE_TO_SELF, 0f, Animation.RELATIVE_TO_SELF, 0f,
@@ -58,7 +56,7 @@ class SplashActivity : AppCompatActivity() {
         }
         imgBee.startAnimation(beeEnter)
 
-        // ── 3. Bounce continuo: la abejita flota arriba y abajo ───────────
+        // 3. Bounce continuo: la abejita flota
         Handler(Looper.getMainLooper()).postDelayed({
             val bounce = TranslateAnimation(
                 Animation.RELATIVE_TO_SELF, 0f, Animation.RELATIVE_TO_SELF, 0f,
@@ -71,9 +69,9 @@ class SplashActivity : AppCompatActivity() {
                 fillAfter    = true
             }
             imgBee.startAnimation(bounce)
-        }, 1050L) // empieza justo después de que termina el enter
+        }, 1050L)
 
-        // ── 4. "from" + "ArrazolApp" aparecen desde abajo ─────────────────
+        // 4. "from" aparece desde abajo
         val fromAnim = AnimationSet(true).apply {
             addAnimation(TranslateAnimation(
                 Animation.RELATIVE_TO_SELF, 0f, Animation.RELATIVE_TO_SELF, 0f,
@@ -85,6 +83,7 @@ class SplashActivity : AppCompatActivity() {
         }
         txtFrom.startAnimation(fromAnim)
 
+        // 5. "ArrazolApp" aparece desde abajo
         val brandAnim = AnimationSet(true).apply {
             addAnimation(TranslateAnimation(
                 Animation.RELATIVE_TO_SELF, 0f, Animation.RELATIVE_TO_SELF, 0f,
@@ -96,7 +95,7 @@ class SplashActivity : AppCompatActivity() {
         }
         txtBrand.startAnimation(brandAnim)
 
-        // ── 5. Ir a MainActivity después de 5 segundos ────────────────────
+        // 6. Ir a MainActivity después de 5 segundos
         Handler(Looper.getMainLooper()).postDelayed({
             startActivity(Intent(this, MainActivity::class.java))
             overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
@@ -106,12 +105,6 @@ class SplashActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        // No se puede salir durante el splash
-    }
-}
-
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        // No se puede salir durante el splash
+        // Bloquear botón atrás durante el splash
     }
 }
