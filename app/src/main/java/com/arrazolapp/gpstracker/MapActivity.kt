@@ -9,10 +9,10 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
-import android.view.WindowManager
 import android.webkit.*
+import android.widget.Button
+import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.WindowCompat
 import com.google.android.gms.location.*
 
 class MapActivity : AppCompatActivity() {
@@ -20,6 +20,7 @@ class MapActivity : AppCompatActivity() {
     private lateinit var webMap: WebView
     private lateinit var fusedClient: FusedLocationProviderClient
     private var locationCallback: LocationCallback? = null
+    private var isDark = true
 
     private val gpsReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -36,14 +37,18 @@ class MapActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled", "MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Pantalla completa sin barra nativa de la app (pero respetando barras del sistema)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
         setContentView(R.layout.activity_map)
 
         webMap = findViewById(R.id.webMap)
+        val btnBack = findViewById<ImageView>(R.id.btnBack)
+        val btnTheme = findViewById<Button>(R.id.btnTheme)
+
+        btnBack.setOnClickListener { finish() }
+        btnTheme.setOnClickListener {
+            isDark = !isDark
+            webMap.evaluateJavascript("toggleTheme()", null)
+            btnTheme.text = if (isDark) "🌓" else "☀️"
+        }
 
         webMap.settings.apply {
             javaScriptEnabled = true
@@ -81,18 +86,6 @@ class MapActivity : AppCompatActivity() {
 
         // ── NUEVO: JavascriptInterface para abrir apps externas ──
         webMap.addJavascriptInterface(object : Any() {
-            @JavascriptInterface
-            fun goBack() {
-                // Volver a MainActivity (pantalla de tracking)
-                runOnUiThread {
-                    val intent = Intent(this@MapActivity, MainActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    }
-                    startActivity(intent)
-                    finish()
-                }
-            }
-
             @JavascriptInterface
             fun openWaze(lat: Double, lng: Double) {
                 runOnUiThread {
