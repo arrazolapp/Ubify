@@ -636,70 +636,147 @@ function centerOnUser(){recenter();}
 function onSpeedometerClick(){if(!isFollowing)recenter();}
 map.on('dragstart',()=>{isFollowing=false;document.getElementById('speedometer').classList.add('recenter-mode');});
 
-// ═══ ROTACIÓN MANUAL CON DOS DEDOS (estilo Waze) ═══
-// Interceptamos ANTES de que Leaflet procese los eventos touch.
-// Cuando se detectan 2 dedos con rotación dominante, bloqueamos
-// el evento para que Leaflet no haga zoom/pan y aplicamos nosotros la rotación.
+// ═══ TOUCH MANAGER: ROTACIÓN (2 dedos) + PAN COMPENSADO (1 dedo) ═══
+//
+// Problema: Leaflet no sabe que el mapa está rotado visualmente, entonces
+// cuando el usuario arrastra con 1 dedo, el pan se hace en coordenadas
+// del mapa sin rotar. Si el norte está a la izquierda y deslizás hacia
+// arriba, el mapa se mueve horizontalmente en pantalla.
+//
+// Solución: manejamos TODO nosotros con capture:true y pasamos a Leaflet
+// un delta de pan ya compensado por el ángulo de rotación actual.
 (function(){
-  let _startAngle = 0;
-  let _startBearing = 0;
-  let _isRotating = false;
-  let _manualBearing = 0;
-  let _lastDist = 0;
+  const mapEl = document.getElementById('map');
 
+  // ── Estado compartido ──
+  let _manualBearing = 0;   // bearing acumulado (grados)
+  let _currentBearing = 0;  // alias de lectura rápida
+
+  // ── Estado 1 dedo (pan compensado) ──
+  let _panActive = false;
+  let _panLastX = 0, _panLastY = 0;
+
+  // ── Estado 2 dedos (rotación) ──
+  let _rotActive = false;
+  let _rotStartAngle = 0;
+  let _rotStartBearing = 0;
+  let _rotLastDist = 0;
+  let _rotDecided = false;   // ya decidimos si es rotate o zoom
+
+  // ── Helpers ──
   function angle2(t0, t1){
     return Math.atan2(t1.clientY - t0.clientY, t1.clientX - t0.clientX) * 180 / Math.PI;
   }
   function dist2(t0, t1){
     const dx = t1.clientX - t0.clientX, dy = t1.clientY - t0.clientY;
-    return Math.sqrt(dx*dx + dy*dy);
+    return Math.sqrt(dx * dx + dy * dy);
   }
 
-  // Captura en fase de captura (antes de Leaflet) con passive:false para poder hacer preventDefault
-  document.getElementById('map').addEventListener('touchstart', function(e){
-    if(e.touches.length === 2){
-      _startAngle  = angle2(e.touches[0], e.touches[1]);
-      _startBearing = _manualBearing;
-      _lastDist    = dist2(e.touches[0], e.touches[1]);
-      _isRotating  = false; // aún no sabemos si es rotación o zoom
+  // Rota un vector (dx, dy) por -bearing para pasar de espacio-pantalla
+  // al espacio-mapa (sin rotar). bearing en grados.
+  function rotateVector(dx, dy, bearingDeg){
+    const rad = -bearingDeg * Math.PI / 180;
+    return {
+      x:  dx * Math.cos(rad) - dy * Math.sin(rad),
+      y:  dx * Math.sin(rad) + dy * Math.cos(rad)
+    };
+  }
+
+  // ── TOUCHSTART ──
+  mapEl.addEventListener('touchstart', function(e){
+    if(e.touches.length === 1){
+      // 1 dedo: preparar pan compensado
+      _panActive = true;
+      _panLastX = e.touches[0].clientX;
+      _panLastY = e.touches[0].clientY;
+      _rotActive = false;
+    } else if(e.touches.length === 2){
+      // 2 dedos: preparar rotación
+      _panActive = false;
+      _rotActive = true;
+      _rotDecided = false;
+      _rotStartAngle  = angle2(e.touches[0], e.touches[1]);
+      _rotStartBearing = _manualBearing;
+      _rotLastDist    = dist2(e.touches[0], e.touches[1]);
     }
   }, {passive: true, capture: true});
 
-  document.getElementById('map').addEventListener('touchmove', function(e){
-    if(e.touches.length !== 2) return;
+  // ── TOUCHMOVE ──
+  mapEl.addEventListener('touchmove', function(e){
 
-    const t0 = e.touches[0], t1 = e.touches[1];
-    const curAngle = angle2(t0, t1);
-    const curDist  = dist2(t0, t1);
-    const deltaRot = curAngle - _startAngle;
-    const deltaZoom = Math.abs(curDist - _lastDist);
+    // ── 1 dedo: pan compensado ──
+    if(e.touches.length === 1 && _panActive){
+      const dx = e.touches[0].clientX - _panLastX;
+      const dy = e.touches[0].clientY - _panLastY;
+      _panLastX = e.touches[0].clientX;
+      _panLastY = e.touches[0].clientY;
 
-    // Si la rotación supera 8° y es mayor que el cambio de zoom → modo rotación
-    if(!_isRotating && Math.abs(deltaRot) > 8 && Math.abs(deltaRot) > deltaZoom * 0.5){
-      _isRotating = true;
-    }
+      // Si el mapa no está rotado, dejamos que Leaflet lo maneje normal
+      const bearing = _manualBearing % 360;
+      if(Math.abs(bearing) < 2){
+        return; // rotación casi cero → comportamiento normal de Leaflet
+      }
 
-    if(_isRotating){
-      e.preventDefault(); // evitar que Leaflet haga zoom/pan
+      // Compensar: rotar el vector de pantalla al espacio del mapa
+      e.preventDefault();
       e.stopPropagation();
-      _manualBearing = _startBearing + deltaRot;
-      setMapBearing(_manualBearing);
-      isFollowing = false;
-      document.getElementById('speedometer').classList.add('recenter-mode');
+      const compensated = rotateVector(dx, dy, _manualBearing);
+      map.panBy([-compensated.x, -compensated.y], {animate: false, noMoveStart: true});
+      return;
     }
 
-    _lastDist = curDist;
+    // ── 2 dedos: rotación o zoom ──
+    if(e.touches.length === 2 && _rotActive){
+      const t0 = e.touches[0], t1 = e.touches[1];
+      const curAngle = angle2(t0, t1);
+      const curDist  = dist2(t0, t1);
+      const deltaRot = curAngle - _rotStartAngle;
+      const deltaDist = Math.abs(curDist - _rotLastDist);
+
+      // Decidir si es rotación (giro predominante) o zoom (pinch predominante)
+      if(!_rotDecided){
+        if(Math.abs(deltaRot) > 6){
+          _rotDecided = true;
+        } else if(deltaDist > 12){
+          _rotActive = false; // es zoom → dejar a Leaflet
+          return;
+        }
+      }
+
+      if(_rotDecided){
+        e.preventDefault();
+        e.stopPropagation();
+        _manualBearing = _rotStartBearing + deltaRot;
+        _currentBearing = _manualBearing;
+        setMapBearing(_manualBearing);
+        isFollowing = false;
+        document.getElementById('speedometer').classList.add('recenter-mode');
+      }
+
+      _rotLastDist = curDist;
+    }
+
   }, {passive: false, capture: true});
 
-  document.getElementById('map').addEventListener('touchend', function(e){
-    if(e.touches.length < 2){
-      _isRotating = false;
+  // ── TOUCHEND ──
+  mapEl.addEventListener('touchend', function(e){
+    if(e.touches.length === 0){
+      _panActive = false;
+      _rotActive = false;
+      _rotDecided = false;
+    } else if(e.touches.length === 1){
+      // Quedó 1 dedo → preparar pan desde esa posición
+      _rotActive = false;
+      _rotDecided = false;
+      _panActive = true;
+      _panLastX = e.touches[0].clientX;
+      _panLastY = e.touches[0].clientY;
     }
   }, {passive: true, capture: true});
 
-  // Exponer para recenter()
+  // ── API pública ──
   window._getManualBearing = function(){ return _manualBearing; };
-  window._setManualBearing = function(b){ _manualBearing = b; };
+  window._setManualBearing = function(b){ _manualBearing = b; _currentBearing = b; };
 })();
 map.on('click',()=>{closePopup();collapseSearchPanel();});
 function onGpsUpdate(lat,lng,accuracy,speed){updateUserPosition(lat,lng,accuracy,speed);}
