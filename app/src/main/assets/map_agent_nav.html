@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Ubify Navegación</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;--bearing:0deg}
+.leaflet-map-pane,.leaflet-tile-pane,.leaflet-tile{will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.leaflet-container{background:transparent !important}
+html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,'Segoe UI',system-ui,sans-serif}
+body{background:#2b3648}
+.leaflet-container{background:#2b3648 !important}
+body.light{background:#f2ede3}
+body.light .leaflet-container{background:#f2ede3 !important}
+#map{position:fixed;inset:0;z-index:0;background:#2b3648}
+body.light #map{background:#f2ede3}
+.leaflet-control-zoom,.leaflet-control-attribution{display:none!important}
+
+/* ── CURSOR ── */
+.nav-wrap{position:relative;width:40px;height:46px;filter:drop-shadow(0 2px 7px rgba(0,0,0,0.5));background:transparent!important;border:none!important;cursor:pointer}
+.nav-wrap img{background:transparent!important;border:none!important;outline:none!important}
+.leaflet-div-icon{background:transparent!important;border:none!important}
+.leaflet-marker-icon{background:transparent!important;border:none!important}
+.client-pin{background:transparent!important;border:none!important}
+.client-pin svg{transition:transform 0.1s ease;transform:rotate(var(--bearing, 0deg))}
+.nav-wrap svg,.nav-wrap img{transition:transform 0.1s ease;transform-origin:50% 50%}
+.nav-glow{position:absolute;inset:-14px;border-radius:50%;background:radial-gradient(circle,rgba(0,188,212,0.22) 0%,transparent 65%);animation:glow 2s ease-in-out infinite;pointer-events:none}
+@keyframes glow{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.9;transform:scale(1.3)}}
+
+/* ── FABs DERECHA (círculos negros Waze) ── */
+.fab-col{position:fixed;top:16px;right:14px;z-index:800;display:flex;flex-direction:column;gap:10px}
+.fab-menu{position:fixed;top:16px;left:14px;z-index:800;width:52px;height:52px;border-radius:14px;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);border:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
+.fab-menu span{width:20px;height:2.5px;background:white;border-radius:2px;display:block}
+.light .fab-menu{background:rgba(255,255,255,0.95);box-shadow:0 2px 10px rgba(0,0,0,0.15)}
+.light .fab-menu span{background:#222}
+.fab{width:50px;height:50px;border-radius:50%;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
+.fab svg{width:26px;height:26px}
+/* fab-alert: ícono de alerta estilo señal de tránsito */
+.fab-alert{position:fixed;bottom:185px;right:14px;z-index:800;width:72px;height:72px;border-radius:16px;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:bottom .3s cubic-bezier(.4,0,.2,1);filter:drop-shadow(0 4px 12px rgba(0,0,0,0.4))}
+.fab-alert svg{width:56px;height:56px}
+.light .fab-alert{filter:drop-shadow(0 3px 8px rgba(0,0,0,0.2))}
+
+/* ── VELOCÍMETRO ── */
+.speedometer{position:fixed;bottom:185px;left:14px;z-index:800;width:72px;height:72px;cursor:default;border-radius:50%;overflow:hidden;transition:bottom .3s cubic-bezier(.4,0,.2,1),transform .18s ease}
+.speedometer.recenter-mode{cursor:pointer;transform:scale(1.05)}
+.recenter-icon{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s ease}
+.recenter-icon svg{width:32px;height:32px}
+.speedometer.recenter-mode .speedo-inner{opacity:0;pointer-events:none}
+.speedometer.recenter-mode .recenter-icon{opacity:1;pointer-events:auto}
+.speedo-svg{position:absolute;top:0;left:0;width:72px;height:72px}
+.speedo-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.speed-val{font-size:27px;font-weight:900;color:white;line-height:1;text-shadow:0 1px 4px rgba(0,0,0,0.6)}
+.speed-unit{font-size:8px;color:rgba(255,255,255,0.55);font-weight:700;letter-spacing:1.5px;margin-top:1px}
+
+/* ── BARRA SUPERIOR NAV ── */
+.nav-top{position:fixed;top:0;left:0;right:0;z-index:900;background:#1b2433;display:none}
+.nav-top.active{display:block}
+.nav-top-inner{display:flex;align-items:center;gap:10px;padding:14px 14px 12px}
+.turn-box{background:#4a90d9;border-radius:12px;width:58px;height:58px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:30px;line-height:1}
+.nav-top-info{flex:1;min-width:0}
+.nav-top-dist{font-size:28px;font-weight:900;color:white;line-height:1}
+.nav-top-street{font-size:14px;color:rgba(255,255,255,0.65);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-top-close{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:rgba(255,255,255,0.7);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* ── BARRA INFERIOR ── */
+.bottom-bar{position:fixed;bottom:0;left:0;right:0;z-index:900}
+
+/* Panel búsqueda */
+.search-panel{background:rgba(20,24,33,0.97);backdrop-filter:blur(16px);padding:8px 14px 14px}
+.sh{width:36px;height:4px;background:rgba(255,255,255,0.13);border-radius:2px;margin:0 auto 10px}
+.search-row{display:flex;align-items:center;background:rgba(255,255,255,0.07);border-radius:30px;padding:0 16px;border:1px solid rgba(255,255,255,0.07);margin-bottom:0}
+.si{color:rgba(255,255,255,0.38);font-size:17px;margin-right:10px}
+.search-input{flex:1;background:none;border:none;color:white;font-size:15px;padding:13px 0;outline:none}
+.search-input::placeholder{color:rgba(255,255,255,0.32)}
+.sm{color:rgba(255,255,255,0.38);font-size:19px;cursor:pointer}
+.quick-tabs{display:flex;gap:8px;margin-top:10px}
+.qt{flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:11px 8px;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:7px;cursor:pointer}
+.qt-ic{font-size:18px;line-height:1}
+.qt-lb{font-size:13px;color:rgba(255,255,255,0.75);font-weight:700}
+.light .qt{background:rgba(0,0,0,0.04);border-color:rgba(0,0,0,0.07)}
+.light .qt-lb{color:#333}
+.qt-new .qt-lb{color:#4a90d9;font-weight:700}
+.light .qt-new .qt-lb{color:#4a90d9}
+.results-list{max-height:210px;overflow-y:auto}
+.results-list::-webkit-scrollbar{display:none}
+.result-row{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer}
+.rpin{width:36px;height:36px;border-radius:10px;background:rgba(245,106,0,0.1);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.rinfo{flex:1;min-width:0}
+.rname{font-size:14px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rsub{font-size:11px;color:rgba(255,255,255,0.38);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rdist{font-size:11px;color:#f56a00;font-weight:700;flex-shrink:0}
+
+/* Panel navegación */
+.nav-panel{background:rgba(0,0,0,0.9);backdrop-filter:blur(16px);padding:8px 18px 22px;display:none}
+.nav-panel.active{display:block}
+.nav-row{display:flex;align-items:center}
+.nav-cancel{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;color:rgba(255,255,255,0.6);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:14px}
+.nav-center{flex:1;text-align:center}
+.nav-arrival{font-size:32px;font-weight:900;color:white;line-height:1}
+.nav-details{font-size:13px;color:rgba(255,255,255,0.45);margin-top:4px}
+.nav-dot{margin:0 5px;opacity:.35}
+.nav-recenter{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:14px}
+
+/* ── POPUP CLIENTE ── */
+.client-popup{position:fixed;bottom:145px;left:12px;right:12px;background:rgba(20,24,33,0.97);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.07);border-radius:18px;padding:18px;z-index:1000;display:none;box-shadow:0 8px 36px rgba(0,0,0,0.6);transition:bottom .3s cubic-bezier(.4,0,.2,1)}
+.client-popup.visible{display:block;animation:popUp .22s ease}
+@keyframes popUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.popup-name{font-size:16px;font-weight:800;color:white;margin-bottom:3px}
+.popup-addr{font-size:12px;color:rgba(255,255,255,0.42);margin-bottom:14px}
+.popup-btns{display:flex;gap:8px}
+.popup-btn{flex:1;padding:12px 4px;border-radius:12px;border:none;font-size:13px;font-weight:700;cursor:pointer;text-align:center}
+.pb-route{background:#f56a00;color:white}
+.pb-waze{background:#33ccff;color:#000}
+.pb-gmaps{background:#4285f4;color:white}
+.pb-close{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.55)}
+
+/* ── SHEET RUTA ── */
+.route-sheet{position:fixed;bottom:0;left:0;right:0;z-index:1001;display:none}
+.route-sheet.active{display:block;animation:slideUp .28s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.route-inner{background:rgba(20,24,33,0.99);border-radius:20px 20px 0 0;border-top:1px solid rgba(255,255,255,0.06);padding:16px 20px 32px;box-shadow:0 -8px 40px rgba(0,0,0,0.6)}
+.rh{width:36px;height:4px;background:rgba(255,255,255,0.11);border-radius:2px;margin:0 auto 16px}
+.route-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+.route-eta{font-size:36px;font-weight:900;color:white;line-height:1}
+.route-dist{font-size:16px;color:rgba(255,255,255,0.45);font-weight:600;margin-top:6px}
+.route-name{font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:2px}
+.route-info{font-size:11px;color:rgba(255,255,255,0.28)}
+.route-actions{display:flex;gap:10px;margin-top:16px}
+.rb{flex:1;padding:15px;border-radius:14px;border:none;font-size:15px;font-weight:800;cursor:pointer}
+.rb-go{background:#4a90d9;color:white}
+.rb-cancel{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.6)}
+
+/* ── PROXIMITY PILL (reemplaza lista automática) ── */
+.prox-pill{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:850;
+  background:rgba(20,26,38,0.88);backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.1);border-radius:30px;
+  padding:8px 16px;display:none;align-items:center;gap:8px;
+  max-width:calc(100% - 140px);overflow:hidden;
+  box-shadow:0 4px 20px rgba(0,0,0,0.4);animation:pillIn .3s ease}
+.prox-pill.visible{display:flex}
+@keyframes pillIn{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.prox-dot{width:8px;height:8px;border-radius:50%;background:#f56a00;flex-shrink:0;animation:proxPulse 1.5s ease-in-out infinite}
+@keyframes proxPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.75)}}
+.prox-scroll-wrap{overflow:hidden;flex:1;position:relative;height:18px}
+.prox-text{white-space:nowrap;font-size:13px;font-weight:600;color:rgba(255,255,255,0.9);
+  position:absolute;animation:proxScroll linear infinite}
+@keyframes proxScroll{0%{transform:translateX(60px)}100%{transform:translateX(-100%)}}
+.prox-close{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,0.08);
+  border:none;color:rgba(255,255,255,0.4);font-size:11px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0}
+
+/* ── SWIPE HANDLE del bottom-bar ── */
+.swipe-handle{height:22px;width:100%;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none}
+.swipe-handle:active{cursor:grabbing}
+.sh-inner{width:36px;height:4px;background:rgba(255,255,255,0.18);border-radius:2px}
+.search-panel-inner{overflow:hidden;transition:max-height .3s ease}
+.search-panel-inner.hidden{max-height:0}
+.search-panel-inner.shown{max-height:180px}
+.search-panel-inner.shown-full{max-height:400px}
+/* Separador de sección en el panel */
+.nearby-header{display:flex;align-items:center;gap:8px;padding:10px 2px 6px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase}
+.light .nearby-header{color:rgba(0,0,0,0.35)}
+
+/* ── LIGHT MODE ── */
+body.light{background:#e8e0d5}
+.light .speedometer{background:transparent;box-shadow:none}
+.light .speed-val{color:white}
+.light .speed-unit{color:rgba(255,255,255,0.5)}
+.light .fab{background:rgba(255,255,255,0.95);box-shadow:0 2px 10px rgba(0,0,0,0.15)}
+.light .fab svg{stroke:#222}
+.light #fabTheme svg{fill:#222}
+.light .search-panel,.light .nav-panel{background:rgba(255,255,255,0.97)}
+.light .sh,.light .nav-row .sh{background:rgba(0,0,0,0.1)}
+.light .nav-cancel{background:rgba(0,0,0,0.06);color:#555}
+.light .nav-recenter{background:rgba(0,0,0,0.06)}
+.light .nav-arrival{color:#222}
+.light .nav-details{color:#888}
+.light .nav-dot{color:#ccc}
+.light .search-row{background:rgba(0,0,0,0.04);border-color:rgba(0,0,0,0.06)}
+.light .search-input{color:#222}
+.light .search-input::placeholder{color:rgba(0,0,0,0.35)}
+.light .si,.light .sm{color:rgba(0,0,0,0.38)}
+.light .qt{background:rgba(0,0,0,0.04);border-color:rgba(0,0,0,0.05)}
+.light .qt-lb{color:#555}
+.light .rname{color:#222}
+.light .rsub{color:#888}
+.light .result-row{border-color:rgba(0,0,0,0.05)}
+.light .client-popup,.light .route-inner{background:rgba(255,255,255,0.99);border-color:rgba(0,0,0,0.07)}
+.light .popup-name,.light .route-eta{color:#222}
+.light .popup-addr,.light .route-name,.light .route-dist{color:#888}
+.light .pb-close,.light .rb-cancel{background:rgba(0,0,0,0.06);color:#666}
+.light .nav-arrival{color:#222}
+.light .nav-details{color:#888}
+.light .nav-top{background:#f0f0f0}
+.light .nav-top-dist,.light .nav-top-street{color:#222}
+.light .nav-top-close{background:rgba(0,0,0,0.08);color:#555}
+
+/* ── CURSOR PICKER ── */
+.cursor-picker-overlay{position:fixed;inset:0;z-index:1200;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.6)}
+.cursor-picker-overlay.active{display:flex}
+.cursor-picker{background:#1b2433;border-radius:20px;padding:24px;width:280px;box-shadow:0 8px 40px rgba(0,0,0,0.5);animation:popUp 0.25s ease}
+@keyframes popUp{from{opacity:0;transform:scale(0.9)}to{opacity:1;transform:scale(1)}}
+.cp-title{font-size:18px;font-weight:800;color:white;text-align:center;margin-bottom:20px}
+.cp-options{display:flex;gap:16px;justify-content:center;margin-bottom:20px}
+.cp-option{width:100px;height:120px;border-radius:16px;background:rgba(255,255,255,0.05);border:2px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all 0.2s}
+.cp-option.selected{border-color:#f56a00;background:rgba(245,106,0,0.1)}
+.cp-option:active{transform:scale(0.95)}
+.cp-option img,.cp-option svg{width:48px;height:48px;object-fit:contain}
+.cp-label{font-size:12px;color:rgba(255,255,255,0.7);font-weight:600}
+.cp-close{width:100%;padding:12px;border-radius:12px;background:#f56a00;color:white;border:none;font-size:15px;font-weight:700;cursor:pointer}
+.light .cursor-picker{background:white}
+.light .cp-title{color:#222}
+.light .cp-option{background:rgba(0,0,0,0.03)}
+.light .cp-label{color:#666}
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- Proximity pill (aparece arriba cuando hay cliente cercano) -->
+<div class="prox-pill" id="proxPill">
+  <div class="prox-dot"></div>
+  <div class="prox-scroll-wrap"><span class="prox-text" id="proxText"></span></div>
+  <button class="prox-close" onclick="dismissProxPill()">✕</button>
+</div>
+
+<!-- FABs derecha -->
+<!-- Hamburguesa izquierda (estilo Waze) -->
+<button class="fab-menu" onclick="toggleMenu()">
+  <span></span><span></span><span></span>
+</button>
+
+<div class="fab-col" id="fabCol">
+  <button class="fab" id="fabTheme" onclick="toggleTheme()" style="font-size:26px;line-height:1">🌙</button>
+</div>
+
+<div class="fab-alert" onclick="reportAlert()">
+  <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <!-- Sombra -->
+    <path d="M30.2 6L4 54a4 4 0 003.5 6h49a4 4 0 003.5-6L34 6a4 4 0 00-3.8 0z" fill="rgba(0,0,0,0.15)" transform="translate(1,2)"/>
+    <!-- Borde oscuro -->
+    <path d="M30.2 6L4 54a4 4 0 003.5 6h49a4 4 0 003.5-6L34 6a4 4 0 00-3.8 0z" fill="#c67800" stroke="#8B5A00" stroke-width="1"/>
+    <!-- Cuerpo amarillo -->
+    <path d="M30.8 9L7 53a3 3 0 002.6 4.5h44.8a3 3 0 002.6-4.5L33.2 9a3 3 0 00-2.4 0z" fill="#FFB800"/>
+    <!-- Brillo superior -->
+    <path d="M31 12L10 50h22z" fill="rgba(255,255,255,0.2)"/>
+    <!-- Signo de exclamación -->
+    <rect x="29.5" y="22" width="5" height="18" rx="2.5" fill="#333"/>
+    <circle cx="32" cy="47" r="3" fill="#333"/>
+  </svg>
+</div>
+
+<!-- Velocímetro con tacómetro -->
+<div class="speedometer" id="speedometer" onclick="onSpeedometerClick()">
+  <svg class="speedo-svg" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg" id="speedoSvg">
+    <defs><filter id="segGlow"><feGaussianBlur stdDeviation="1.2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <circle cx="36" cy="36" r="34" fill="rgba(20,26,38,0.72)" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+    <g id="tachoSegs"></g>
+  </svg>
+  <div class="speedo-inner">
+    <div class="speed-val" id="speedVal">0</div>
+    <div class="speed-unit">km/h</div>
+  </div>
+  <!-- Ícono de re-centrar (aparece al desplazar el mapa) -->
+  <div class="recenter-icon">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="12" r="3" fill="white"/>
+      <circle cx="12" cy="12" r="7" stroke="white" stroke-width="2" fill="none"/>
+      <line x1="12" y1="2" x2="12" y2="5" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      <line x1="12" y1="19" x2="12" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      <line x1="2" y1="12" x2="5" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      <line x1="19" y1="12" x2="22" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </div>
+</div>
+
+<!-- Barra superior (navegación activa) -->
+<div class="nav-top" id="navTop">
+  <div class="nav-top-inner">
+    <div class="turn-box" id="turnBox">↑</div>
+    <div class="nav-top-info">
+      <div class="nav-top-dist" id="navTopDist">--</div>
+      <div class="nav-top-street" id="navTopStreet">--</div>
+    </div>
+    <button class="nav-top-close" onclick="stopNavigation()">✕</button>
+  </div>
+</div>
+
+<!-- Barra inferior -->
+<div class="bottom-bar" id="bottomBar">
+  <!-- Búsqueda -->
+  <div class="search-panel" id="searchPanel">
+    <div class="swipe-handle" id="swipeHandle"><div class="sh-inner"></div></div>
+    <!-- La barra de búsqueda siempre visible -->
+    <div class="search-row" style="margin:0 0 0 0">
+      <span class="si">🔍</span>
+      <input class="search-input" id="searchInput" type="text" placeholder="¿Adónde vas?" oninput="searchClients(this.value)" onfocus="expandSearchPanelFull()">
+      <span class="sm">🎤</span>
+    </div>
+    <!-- Contenido colapsable: quick tabs + resultados -->
+    <div class="search-panel-inner hidden" id="searchPanelInner">
+      <div style="padding:0 0 4px">
+      <div class="quick-tabs">
+        <div class="qt" onclick="centerOnUser()"><div class="qt-ic">🏠</div><div class="qt-lb">Casa</div></div>
+        <div class="qt" onclick="centerOnUser()"><div class="qt-ic">💼</div><div class="qt-lb">Trabajo</div></div>
+        <div class="qt qt-new"><div class="qt-ic" style="font-size:15px;font-weight:800;color:#4a90d9">＋</div><div class="qt-lb">Nuevo</div></div>
+      </div>
+      <div class="results-list" id="resultsList"></div>
+      </div>
+    </div>
+  </div>
+  <!-- Navegación activa -->
+  <div class="nav-panel" id="navPanel">
+    <div class="sh" style="margin-bottom:12px"></div>
+    <div class="nav-row">
+      <button class="nav-cancel" onclick="stopNavigation()">✕</button>
+      <div class="nav-center">
+        <div class="nav-arrival" id="navArrival">--:--</div>
+        <div class="nav-details">
+          <span id="navRemainTime">-- min</span><span class="nav-dot">•</span><span id="navRemainDist">-- km</span>
+        </div>
+      </div>
+      <button class="nav-recenter" onclick="recenter()">🎯</button>
+    </div>
+  </div>
+</div>
+
+<!-- Popup cliente -->
+<div class="client-popup" id="clientPopup">
+  <div class="popup-name" id="popupName">--</div>
+  <div class="popup-addr" id="popupAddr">--</div>
+  <div class="popup-btns">
+    <button class="popup-btn pb-route" onclick="startRoutePreview()">🗺️ Ruta</button>
+    <button class="popup-btn pb-waze" onclick="openWaze()">Waze</button>
+    <button class="popup-btn pb-gmaps" onclick="openGoogleMaps()">Maps</button>
+    <button class="popup-btn pb-close" onclick="closePopup()">✕</button>
+  </div>
+</div>
+
+<!-- Sheet de ruta -->
+<div class="route-sheet" id="routeSheet">
+  <div class="route-inner">
+    <div class="rh"></div>
+    <div class="route-head">
+      <div>
+        <div class="route-eta" id="routeEta">--</div>
+        <div class="route-name" id="routeName">Calculando...</div>
+        <div class="route-info" id="routeInfo">Mejor ruta · Tráfico habitual</div>
+      </div>
+      <div class="route-dist" id="routeDist">--</div>
+    </div>
+    <div class="route-actions">
+      <button class="rb rb-cancel" onclick="cancelRoute()">Cancelar</button>
+      <button class="rb rb-go" onclick="startActiveNav()">Ir ahora</button>
+    </div>
+  </div>
+</div>
+
+<!-- Menú lateral -->
+
+<!-- Selector de cursor (como Waze) -->
+<div class="cursor-picker-overlay" id="cursorPicker" onclick="if(event.target===this)closeCursorPicker()">
+  <div class="cursor-picker">
+    <div class="cp-title">Elegí tu vehículo</div>
+    <div class="cp-options">
+      <div class="cp-option" id="cpBee" onclick="selectCursor('bee')">
+        <img src="data:image/png;base64,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" alt="Ubeefy">
+        <div class="cp-label">Ubeefy</div>
+      </div>
+      <div class="cp-option" id="cpArrow" onclick="selectCursor('arrow')">
+        <svg viewBox="0 0 100 115" xmlns="http://www.w3.org/2000/svg">
+          <defs><radialGradient id="cpg" cx="50%" cy="38%" r="62%"><stop offset="0%" stop-color="#5BE0F5"/><stop offset="100%" stop-color="#09B8D8"/></radialGradient></defs>
+          <path d="M50 11 L87 88 Q87 96 76 96 Q64 96 50 89 Q36 96 24 96 Q13 96 13 88 Z" fill="url(#cpg)"/>
+        </svg>
+        <div class="cp-label">Flecha</div>
+      </div>
+    </div>
+    <button class="cp-close" onclick="closeCursorPicker()">Listo</button>
+  </div>
+</div>
+
+<div style="position:fixed;inset:0;z-index:1100;display:none" id="menuWrap">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,0.45)" onclick="closeMenu()"></div>
+  <div style="position:absolute;top:0;left:0;bottom:0;width:272px;background:#1b2433;display:flex;flex-direction:column;box-shadow:4px 0 28px rgba(0,0,0,0.5);animation:menuIn .25s ease">
+    <div style="padding:52px 20px 20px;background:rgba(74,144,217,0.9)">
+      <div style="font-size:22px;font-weight:800;color:white">🧭 Ubify Navegación</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:3px" id="menuUser">Navigator</div>
+    </div>
+    <div style="flex:1;overflow-y:auto">
+      <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;color:rgba(255,255,255,0.8);font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05)" onclick="closeMenu();toggleTheme()">🌓 Modo claro / oscuro</div>
+      <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;color:rgba(255,255,255,0.8);font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05)" onclick="closeMenu();recenter()">🎯 Centrar en mi posición</div>
+      <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;color:rgba(255,255,255,0.8);font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05)" onclick="closeMenu();openCursorPicker()">🐝 Cambiar vehículo</div>
+    </div>
+  </div>
+</div>
+<style>@keyframes menuIn{from{transform:translateX(-100%)}to{transform:translateX(0)}}</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+// ═══ CONFIG ═══
+// Versión standalone — solo navegación, sin tracking
+let COMPANY_ID='demo_corp', USER_ID='nav_user', userName='Navigator';
+function setConfig(c,u,n){
+  COMPANY_ID=c;
+  USER_ID=u||'nav_user';
+  userName=n||'Navigator';
+  document.getElementById('menuUser').textContent=userName;
+  initFirebase();
+}
+// Auto-inicializar con company guardada en localStorage (si el usuario ya configuró antes)
+try{
+  const saved=localStorage.getItem('ubify_nav_company');
+  if(saved)COMPANY_ID=saved;
+}catch(e){}
+
+firebase.initializeApp({
+  apiKey:"AIzaSyAP8HT3Zj1chnXt4Yes6dOPCCss6Vdmehw",
+  authDomain:"tracking-gps-arrazolapp.firebaseapp.com",
+  databaseURL:"https://tracking-gps-arrazolapp-default-rtdb.firebaseio.com",
+  projectId:"tracking-gps-arrazolapp",
+  storageBucket:"tracking-gps-arrazolapp.firebasestorage.app",
+  messagingSenderId:"931177352455",
+  appId:"1:931177352455:web:1c8c4cbf4b9607d64689a2"
+});
+const db=firebase.database();
+
+// ═══ MAPA ═══
+const map=L.map('map',{center:[9.9381,-84.0795],zoom:16,zoomControl:false,attributionControl:false});
+// ═══ TACÓMETRO ═══
+const TACHO_SEGS=30,MAX_SPD=120;
+function buildTacho(){
+  const g=document.getElementById('tachoSegs');if(!g)return;
+  const cx=36,cy=36,r=31,startDeg=-220,totalDeg=280,gap=2.5,segDeg=(totalDeg/TACHO_SEGS)-gap;
+  for(let i=0;i<TACHO_SEGS;i++){
+    const a1=(startDeg+i*(totalDeg/TACHO_SEGS))*Math.PI/180;
+    const a2=(startDeg+i*(totalDeg/TACHO_SEGS)+segDeg)*Math.PI/180;
+    const x1=cx+(r-5)*Math.cos(a1),y1=cy+(r-5)*Math.sin(a1);
+    const x2=cx+r*Math.cos(a1),y2=cy+r*Math.sin(a1);
+    const x3=cx+r*Math.cos(a2),y3=cy+r*Math.sin(a2);
+    const x4=cx+(r-5)*Math.cos(a2),y4=cy+(r-5)*Math.sin(a2);
+    const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d',`M${x1.toFixed(2)},${y1.toFixed(2)} L${x2.toFixed(2)},${y2.toFixed(2)} L${x3.toFixed(2)},${y3.toFixed(2)} L${x4.toFixed(2)},${y4.toFixed(2)} Z`);
+    p.setAttribute('fill','rgba(255,255,255,0.10)');p.setAttribute('id',`seg${i}`);g.appendChild(p);
+  }
+}
+function updateTacho(kmh){
+  const filled=Math.min(TACHO_SEGS,Math.round((kmh/MAX_SPD)*TACHO_SEGS));
+  for(let i=0;i<TACHO_SEGS;i++){
+    const s=document.getElementById(`seg${i}`);if(!s)continue;
+    if(i<filled){
+      const t=i/(TACHO_SEGS-1);
+      let r,g,b;
+      if(t<0.5){r=Math.round(t*2*74);g=Math.round(210-t*2*68);b=Math.round(120+t*2*97);}
+      else{r=Math.round(74+(t-0.5)*2*181);g=Math.round(142-(t-0.5)*2*88);b=Math.round(217-(t-0.5)*2*206);}
+      s.setAttribute('fill',`rgba(${r},${g},${b},0.92)`);
+      s.setAttribute('filter',i>=filled-2?'url(#segGlow)':'');
+    }else{s.setAttribute('fill','rgba(255,255,255,0.10)');s.setAttribute('filter','');}
+  }
+}
+document.addEventListener('DOMContentLoaded',()=>buildTacho());
+
+let isDark=true;
+const TILES={
+  dark:'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+  dark_labels:'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+  light:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',
+  light_labels:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png'
+};
+// Create custom pane for labels (higher z-index so labels appear on top)
+map.createPane('labelsPane');
+map.getPane('labelsPane').style.zIndex=450;
+map.getPane('labelsPane').style.pointerEvents='none';
+
+let tileLayer=L.tileLayer(TILES.dark,{maxZoom:20,keepBuffer:12,updateWhenIdle:false,updateWhenZooming:true,crossOrigin:true}).addTo(map);
+let labelsLayer=L.tileLayer(TILES.dark_labels,{maxZoom:20,keepBuffer:12,updateWhenIdle:false,updateWhenZooming:true,crossOrigin:true,pane:'labelsPane'}).addTo(map);
+
+function toggleTheme(){
+  isDark=!isDark;
+  tileLayer.setUrl(isDark?TILES.dark:TILES.light);
+  labelsLayer.setUrl(isDark?TILES.dark_labels:TILES.light_labels);
+  document.body.className=isDark?'':'light';
+  const btn=document.getElementById('fabTheme');
+  if(btn) btn.textContent=isDark?'🌙':'☀️';
+}
+
+// ═══ PANTALLA SIEMPRE ENCENDIDA ═══
+let wakeLock=null;
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator){
+      wakeLock=await navigator.wakeLock.request('screen');
+      console.log('WakeLock activo');
+    }
+  }catch(e){console.log('WakeLock no disponible');}
+}
+requestWakeLock();
+// Re-acquire on visibility change (when user returns to app)
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible') requestWakeLock();
+});
+
+// ═══ CURSOR + NORTE FIJO ═══
+let userMarker=null,accuracyCircle=null;
+let userLat=0,userLng=0,curH=0,smoothH=0,isFollowing=true;
+
+const CURSOR_ARROW=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 115" width="30" height="35">
+  <defs>
+    <filter id="cs"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="rgba(0,0,0,0.4)"/></filter>
+    <radialGradient id="cg" cx="50%" cy="38%" r="62%">
+      <stop offset="0%" stop-color="#5BE0F5"/><stop offset="100%" stop-color="#09B8D8"/>
+    </radialGradient>
+  </defs>
+  <path d="M50 4 L93 90 Q93 101 80 101 Q67 101 50 93 Q33 101 20 101 Q7 101 7 90 Z" fill="white" filter="url(#cs)"/>
+  <path d="M50 11 L87 88 Q87 96 76 96 Q64 96 50 89 Q36 96 24 96 Q13 96 13 88 Z" fill="url(#cg)"/>
+  <path d="M50 11 L76 76 Q64 72 50 69 Q36 72 24 76 Z" fill="rgba(255,255,255,0.18)"/>
+</svg>`;
+const CURSOR_BEE=`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 40 56" width="32" height="45" style="overflow:visible"><defs><filter id="beeShadow"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.45)"/></filter></defs><image href="data:image/png;base64,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" x="0" y="0" width="32" height="45" filter="url(#beeShadow)"/></svg>`;
+let cursorType='bee';
+try{ cursorType=localStorage.getItem('ubify_cursor')||'bee'; }catch(e){}
+let CURSOR=cursorType==='arrow'?CURSOR_ARROW:CURSOR_BEE;
+
+function selectCursor(type){
+  cursorType=type;
+  try{ localStorage.setItem('ubify_cursor',type); }catch(e){}
+  CURSOR=type==='arrow'?CURSOR_ARROW:CURSOR_BEE;
+  // Update picker UI
+  document.getElementById('cpBee').classList.toggle('selected',type==='bee');
+  document.getElementById('cpArrow').classList.toggle('selected',type==='arrow');
+  // Update marker icon
+  if(userMarker){
+    userMarker.setIcon(L.divIcon({
+      className:'nav-wrap',
+      html:`<div class="nav-glow"></div>${CURSOR}`,
+      iconSize:type==='bee'?[32,45]:[30,35],
+      iconAnchor:type==='bee'?[16,23]:[15,18]
+    }));
+    // Re-apply rotation
+    const cEl=document.querySelector('.nav-wrap svg, .nav-wrap img');
+    if(cEl) cEl.style.transform=`rotate(${curH}deg)`;
+  }
+}
+
+function openCursorPicker(){
+  document.getElementById('cpBee').classList.toggle('selected',cursorType==='bee');
+  document.getElementById('cpArrow').classList.toggle('selected',cursorType==='arrow');
+  document.getElementById('cursorPicker').classList.add('active');
+}
+function closeCursorPicker(){ document.getElementById('cursorPicker').classList.remove('active'); }
+
+function lerpAngle(a,b,t){let d=b-a;while(d>180)d-=360;while(d<-180)d+=360;return a+d*t;}
+
+let _bWrap=null;
+function ensureBearingWrap(){
+  if(_bWrap)return _bWrap;
+  const pane=document.querySelector('#map .leaflet-map-pane');
+  if(!pane)return null;
+  _bWrap=document.createElement('div');
+  _bWrap.style.cssText='position:absolute;inset:0;will-change:transform;transition:transform 0s;';
+  pane.parentNode.insertBefore(_bWrap,pane);
+  _bWrap.appendChild(pane);
+  return _bWrap;
+}
+function setMapBearing(deg){
+  const w=ensureBearingWrap();
+  if(!w) return;
+  updateBearingOrigin();
+  w.style.transform=`rotate(${deg}deg)`;
+  // Counter-rotate labels pane so street names stay readable
+  // Must use same transform-origin as the bearing wrap
+  const labelsPane=map.getPane('labelsPane');
+  if(labelsPane){
+    const mapH=map.getContainer().offsetHeight;
+    const mapW=map.getContainer().offsetWidth;
+    const cursorY=mapH - 185 - 36;
+    const cursorX=mapW/2;
+    labelsPane.style.transformOrigin=`${cursorX}px ${cursorY}px`;
+    labelsPane.style.transform=`rotate(${-deg}deg)`;
+    labelsPane.style.transition='transform 0s';
+  }
+  // Counter-rotate client pins via CSS variable
+  document.documentElement.style.setProperty('--bearing', `${-deg}deg`);
+  clearTimeout(window._invTimer);
+  window._invTimer=setTimeout(()=>{try{map.invalidateSize({pan:false});}catch(e){}},400);
+}
+
+function updateUserPosition(lat,lng,accuracy,speed,hdg){
+  const kmh=speed?Math.round(Math.abs(speed)*3.6):0;
+  document.getElementById('speedVal').textContent=kmh;
+  updateTacho(kmh);
+
+  // Solo ignorar si estamos COMPLETAMENTE quietos (< 2 km/h Y < 2m de cambio)
+  if(userLat && userLng && kmh < 2){
+    const moveDist=hav(userLat,userLng,lat,lng)*1000;
+    if(moveDist < 2) return;
+  }
+
+  userLat=lat;userLng=lng;
+
+  // Heading: tomar 60% del nuevo valor para respuesta rápida
+  if(hdg!=null && kmh > 2){
+    smoothH=lerpAngle(smoothH,hdg,0.6);
+    curH=smoothH;
+  }
+
+  if(!userMarker){
+    userMarker=L.marker([lat,lng],{
+      icon:L.divIcon({className:'nav-wrap',html:`<div class="nav-glow"></div>${CURSOR}`,iconSize:cursorType==='bee'?[32,45]:[30,35],iconAnchor:cursorType==='bee'?[16,23]:[15,18]}),
+      zIndexOffset:1000,interactive:true
+    }).addTo(map);
+    userMarker.on('click', function(){ openCursorPicker(); });
+    accuracyCircle=L.circle([lat,lng],{radius:Math.min(accuracy||20,120),fillColor:'rgba(0,188,212,0.06)',fillOpacity:1,color:'rgba(0,188,212,0.2)',weight:1}).addTo(map);
+    map.setView(getOffsetCenter(lat,lng),20);
+  } else {
+    userMarker.setLatLng([lat,lng]);
+    accuracyCircle.setLatLng([lat,lng]).setRadius(Math.min(accuracy||20,120));
+  }
+
+  // Rotar mapa cuando hay movimiento
+  if(isFollowing && kmh > 2){
+    setMapBearing(-curH);
+  }
+  const cEl=document.querySelector('.nav-wrap svg, .nav-wrap img');
+  if(cEl) cEl.style.transform=`rotate(${curH}deg)`;
+
+  if(isFollowing&&userLat){
+    map.panTo(getOffsetCenter(lat,lng),{animate:true,duration:0.3,easeLinearity:0.3,noMoveStart:true});
+  }
+  if(navActive&&navTarget){updateNavInfo();updateRouteProgress(lat,lng);}
+}
+
+function recenter(){
+  isFollowing=true;
+  document.getElementById('speedometer').classList.remove('recenter-mode');
+  if(!userLat)return;
+  // Sincronizar bearing manual con el heading del GPS
+  if(window._setManualBearing) window._setManualBearing(-curH);
+  setMapBearing(-curH);
+  // Centrar suavemente como Waze
+  map.flyTo(getOffsetCenter(userLat,userLng),20,{duration:0.4});
+}
+function centerOnUser(){recenter();}
+function onSpeedometerClick(){if(!isFollowing)recenter();}
+map.on('dragstart',()=>{isFollowing=false;document.getElementById('speedometer').classList.add('recenter-mode');});
+
+// ═══ TOUCH MANAGER: ROTACIÓN (2 dedos) + PAN COMPENSADO (1 dedo) ═══
+//
+// Problema: Leaflet no sabe que el mapa está rotado visualmente, entonces
+// cuando el usuario arrastra con 1 dedo, el pan se hace en coordenadas
+// del mapa sin rotar. Si el norte está a la izquierda y deslizás hacia
+// arriba, el mapa se mueve horizontalmente en pantalla.
+//
+// Solución: manejamos TODO nosotros con capture:true y pasamos a Leaflet
+// un delta de pan ya compensado por el ángulo de rotación actual.
+(function(){
+  const mapEl = document.getElementById('map');
+
+  // ── Estado compartido ──
+  let _manualBearing = 0;   // bearing acumulado (grados)
+  let _currentBearing = 0;  // alias de lectura rápida
+
+  // ── Estado 1 dedo (pan compensado) ──
+  let _panActive = false;
+  let _panLastX = 0, _panLastY = 0;
+
+  // ── Estado 2 dedos (rotación) ──
+  let _rotActive = false;
+  let _rotStartAngle = 0;
+  let _rotStartBearing = 0;
+  let _rotLastDist = 0;
+  let _rotDecided = false;   // ya decidimos si es rotate o zoom
+
+  // ── Helpers ──
+  function angle2(t0, t1){
+    return Math.atan2(t1.clientY - t0.clientY, t1.clientX - t0.clientX) * 180 / Math.PI;
+  }
+  function dist2(t0, t1){
+    const dx = t1.clientX - t0.clientX, dy = t1.clientY - t0.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  // Rota un vector (dx, dy) por -bearing para pasar de espacio-pantalla
+  // al espacio-mapa (sin rotar). bearing en grados.
+  function rotateVector(dx, dy, bearingDeg){
+    const rad = -bearingDeg * Math.PI / 180;
+    return {
+      x:  dx * Math.cos(rad) - dy * Math.sin(rad),
+      y:  dx * Math.sin(rad) + dy * Math.cos(rad)
+    };
+  }
+
+  // ── TOUCHSTART ──
+  mapEl.addEventListener('touchstart', function(e){
+    if(e.touches.length === 1){
+      // 1 dedo: preparar pan compensado
+      _panActive = true;
+      _panLastX = e.touches[0].clientX;
+      _panLastY = e.touches[0].clientY;
+      _rotActive = false;
+    } else if(e.touches.length === 2){
+      // 2 dedos: preparar rotación
+      _panActive = false;
+      _rotActive = true;
+      _rotDecided = false;
+      _rotStartAngle  = angle2(e.touches[0], e.touches[1]);
+      _rotStartBearing = _manualBearing;
+      _rotLastDist    = dist2(e.touches[0], e.touches[1]);
+    }
+  }, {passive: true, capture: true});
+
+  // ── TOUCHMOVE ──
+  mapEl.addEventListener('touchmove', function(e){
+
+    // ── 1 dedo: pan compensado ──
+    if(e.touches.length === 1 && _panActive){
+      const dx = e.touches[0].clientX - _panLastX;
+      const dy = e.touches[0].clientY - _panLastY;
+      _panLastX = e.touches[0].clientX;
+      _panLastY = e.touches[0].clientY;
+
+      // Si el mapa no está rotado, dejamos que Leaflet lo maneje normal
+      const bearing = _manualBearing % 360;
+      if(Math.abs(bearing) < 2){
+        return; // rotación casi cero → comportamiento normal de Leaflet
+      }
+
+      // Compensar: rotar el vector de pantalla al espacio del mapa
+      e.preventDefault();
+      e.stopPropagation();
+      const compensated = rotateVector(dx, dy, _manualBearing);
+      map.panBy([-compensated.x, -compensated.y], {animate: false, noMoveStart: true});
+      return;
+    }
+
+    // ── 2 dedos: rotación o zoom ──
+    if(e.touches.length === 2 && _rotActive){
+      const t0 = e.touches[0], t1 = e.touches[1];
+      const curAngle = angle2(t0, t1);
+      const curDist  = dist2(t0, t1);
+      const deltaRot = curAngle - _rotStartAngle;
+      const deltaDist = Math.abs(curDist - _rotLastDist);
+
+      // Decidir si es rotación (giro predominante) o zoom (pinch predominante)
+      if(!_rotDecided){
+        if(Math.abs(deltaRot) > 6){
+          _rotDecided = true;
+        } else if(deltaDist > 12){
+          _rotActive = false; // es zoom → dejar a Leaflet
+          return;
+        }
+      }
+
+      if(_rotDecided){
+        e.preventDefault();
+        e.stopPropagation();
+        _manualBearing = _rotStartBearing + deltaRot;
+        _currentBearing = _manualBearing;
+        setMapBearing(_manualBearing);
+        isFollowing = false;
+        document.getElementById('speedometer').classList.add('recenter-mode');
+      }
+
+      _rotLastDist = curDist;
+    }
+
+  }, {passive: false, capture: true});
+
+  // ── TOUCHEND ──
+  mapEl.addEventListener('touchend', function(e){
+    if(e.touches.length === 0){
+      _panActive = false;
+      _rotActive = false;
+      _rotDecided = false;
+    } else if(e.touches.length === 1){
+      // Quedó 1 dedo → preparar pan desde esa posición
+      _rotActive = false;
+      _rotDecided = false;
+      _panActive = true;
+      _panLastX = e.touches[0].clientX;
+      _panLastY = e.touches[0].clientY;
+    }
+  }, {passive: true, capture: true});
+
+  // ── API pública ──
+  window._getManualBearing = function(){ return _manualBearing; };
+  window._setManualBearing = function(b){ _manualBearing = b; _currentBearing = b; };
+})();
+map.on('click',()=>{closePopup();collapseSearchPanel();});
+function onGpsUpdate(lat,lng,accuracy,speed){updateUserPosition(lat,lng,accuracy,speed);}
+if(navigator.geolocation){
+  navigator.geolocation.watchPosition(
+    p=>updateUserPosition(p.coords.latitude,p.coords.longitude,p.coords.accuracy,p.coords.speed,p.coords.heading),
+    ()=>{},{enableHighAccuracy:true,maximumAge:2000}
+  );
+}
+
+// ═══ CLIENTES ═══
+let allClients=[],clientMarkers={},selectedClient=null;
+let navTarget=null,navActive=false,routeLine=null,destMarker=null;
+let routeCoords=[],lastProgressIdx=-1;
+const FLAG_ICON=L.divIcon({className:'client-pin',html:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 32 32" width="28" height="28" style="overflow:visible"><defs><filter id="flagSh"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="rgba(0,0,0,0.4)"/></filter></defs><image href="data:image/png;base64,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" x="0" y="0" width="32" height="32" filter="url(#flagSh)"/></svg>',iconSize:[28,28],iconAnchor:[4,28]});
+
+function initFirebase(){
+  if(!COMPANY_ID)return;
+  db.ref(`companies/${COMPANY_ID}/clientes`).on('value',snap=>{
+    const data=snap.val()||{};
+    allClients=[];
+    Object.values(clientMarkers).forEach(m=>map.removeLayer(m));
+    clientMarkers={};
+    Object.entries(data).forEach(([id,c])=>{
+      const lat=parseFloat(c.lat||c.Lat||0),lng=parseFloat(c.lng||c.Lng||c.lon||0);
+      if(!lat||!lng)return;
+      const norm={id,lat,lng,nombre:c.nombre||c.Nombre||'Cliente',codigo:c.codigo||'',telefono:c.telefono||'',direccion:c.direccion||'',zona:c.zona||''};
+      allClients.push(norm);
+      const pin=L.divIcon({className:'client-pin',html:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 80" width="16" height="21"><path d="M30 2C16 2 5 13 5 27c0 18 25 51 25 51S55 45 55 27C55 13 44 2 30 2z" fill="#f56a00" stroke="white" stroke-width="3"/><circle cx="30" cy="27" r="9" fill="white" opacity="0.85"/></svg>`,iconSize:[16,21],iconAnchor:[8,21]});
+      const mk=L.marker([lat,lng],{icon:pin}).addTo(map);
+      mk.on('click',e=>{L.DomEvent.stop(e);showClientPopup(norm);});
+      clientMarkers[id]=mk;
+    });
+    showNearbyClients();
+  });
+}
+
+// ═══ BÚSQUEDA ═══
+function norm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function searchClients(q){
+  expandSearchPanelFull();
+  if(!q||q.length<2){renderNearby();return;}
+  const qn=norm(q);
+  renderResults(allClients.filter(c=>norm([c.nombre,c.codigo,c.direccion,c.zona].join(' ')).includes(qn)).map(c=>({...c,dist:userLat?hav(userLat,userLng,c.lat,c.lng):999})).sort((a,b)=>a.dist-b.dist).slice(0,30));
+}
+
+// ═══ SWIPE PANEL ═══
+let panelExpanded=false; // nivel 1: quick tabs visibles
+let panelFull=false;     // nivel 2: clientes cercanos visibles
+let swipeStartY=0,swipeCurY=0,swipeDragging=false;
+
+function expandSearchPanel(){
+  if(panelFull)return;
+  if(!panelExpanded){
+    panelExpanded=true;panelFull=false;
+    document.getElementById('searchPanelInner').className='search-panel-inner shown';
+    document.getElementById('resultsList').innerHTML=''; // solo quick tabs en nivel 1
+  }
+  setTimeout(updateFloatingButtons,320);
+}
+function expandSearchPanelFull(){
+  panelExpanded=true;panelFull=true;
+  document.getElementById('searchPanelInner').className='search-panel-inner shown-full';
+  renderNearby();
+  setTimeout(updateFloatingButtons,320);
+}
+function collapseSearchPanel(){
+  panelExpanded=false;panelFull=false;
+  document.getElementById('searchPanelInner').className='search-panel-inner hidden';
+  document.getElementById('searchInput').value='';
+  document.getElementById('searchInput').blur();
+  document.getElementById('resultsList').innerHTML='';
+  setTimeout(updateFloatingButtons,320);
+}
+
+const swipeEl=document.getElementById('swipeHandle');
+swipeEl.addEventListener('touchstart',e=>{swipeDragging=true;swipeStartY=e.touches[0].clientY;},{passive:true});
+swipeEl.addEventListener('touchmove',e=>{if(!swipeDragging)return;swipeCurY=e.touches[0].clientY;},{passive:true});
+swipeEl.addEventListener('touchend',()=>{
+  if(!swipeDragging)return;swipeDragging=false;
+  const dy=swipeStartY-swipeCurY; // positivo = swipe up
+  if(dy>25){
+    if(!panelExpanded)expandSearchPanel();
+    else if(!panelFull)expandSearchPanelFull();
+  } else if(dy<-25){
+    if(panelFull)expandSearchPanel(); // bajar de nivel 2 a nivel 1
+    else collapseSearchPanel();       // bajar de nivel 1 a cerrado
+  }
+},{passive:true});
+// Click en el handle: sube un nivel o baja un nivel
+swipeEl.addEventListener('click',()=>{
+  if(!panelExpanded)expandSearchPanel();
+  else if(!panelFull)expandSearchPanelFull();
+  else collapseSearchPanel();
+});
+
+// ═══ CLIENTES CERCANOS (nivel 2 del panel) ═══
+function renderNearby(){
+  if(!allClients.length){document.getElementById('resultsList').innerHTML='';return;}
+  if(!userLat){document.getElementById('resultsList').innerHTML=`<div style="text-align:center;color:rgba(255,255,255,0.35);padding:14px;font-size:13px">📍 ${allClients.length} clientes cargados</div>`;return;}
+  const sorted=allClients.map(c=>({...c,dist:hav(userLat,userLng,c.lat,c.lng)})).sort((a,b)=>a.dist-b.dist).slice(0,8);
+  const header='<div class="nearby-header">📍 Clientes más cercanos</div>';
+  document.getElementById('resultsList').innerHTML=header+sorted.map(c=>`<div class="result-row" onclick="selectClient('${c.id}')"><div class="rpin">📍</div><div class="rinfo"><div class="rname">${c.nombre}</div><div class="rsub">${c.direccion||c.zona||c.codigo||''}</div></div><div class="rdist">${c.dist<1?Math.round(c.dist*1000)+'m':c.dist.toFixed(1)+'km'}</div></div>`).join('');
+}
+function showNearbyClients(){renderNearby();}
+
+// ═══ PROXIMITY PILL ═══
+let proxDismissed=false;
+let lastProxId=null;
+const PROX_RADIUS=0.3; // km
+
+function updateProxPill(){
+  if(!userLat||!allClients.length)return;
+  const nearby=allClients.map(c=>({...c,dist:hav(userLat,userLng,c.lat,c.lng)})).sort((a,b)=>a.dist-b.dist);
+  const closest=nearby[0];
+  if(!closest||closest.dist>PROX_RADIUS){hidePill();lastProxId=null;proxDismissed=false;return;}
+  if(closest.id!==lastProxId){proxDismissed=false;lastProxId=closest.id;}
+  if(proxDismissed){return;}
+  const distTxt=closest.dist<0.1?`${Math.round(closest.dist*1000)}m`:`${closest.dist.toFixed(2)}km`;
+  const msg=`📍 Cerca: ${closest.nombre}  ·  ${distTxt}`;
+  showPill(msg);
+}
+function showPill(msg){
+  const pill=document.getElementById('proxPill');
+  const txt=document.getElementById('proxText');
+  txt.textContent=msg;
+  pill.classList.add('visible');
+  // Ajustar duración del scroll al largo del texto
+  const duration=Math.max(4,msg.length*0.22)+'s';
+  txt.style.animationDuration=duration;
+}
+function hidePill(){document.getElementById('proxPill').classList.remove('visible');}
+function dismissProxPill(){proxDismissed=true;hidePill();}
+
+// ═══ ÍCONOS FLOTANTES + REENCUADRE DEL MAPA ═══
+function updateFloatingButtons(){
+  const bar=document.getElementById('bottomBar');
+  const barH=bar?bar.offsetHeight:0;
+  const GAP=16;
+  const bottom=barH+GAP;
+  document.getElementById('speedometer').style.bottom=bottom+'px';
+  document.querySelector('.fab-alert').style.bottom=bottom+'px';
+  const popup=document.getElementById('clientPopup');
+  if(popup&&popup.classList.contains('visible')){
+    popup.style.bottom=(barH+8)+'px';
+  }
+  // Reencuadrar el mapa para que el cursor no quede detrás de la barra
+  if(isFollowing&&userLat&&map.getContainer()){
+    map.panTo(getOffsetCenter(userLat,userLng),{animate:true,duration:0.35,easeLinearity:0.5,noMoveStart:true});
+  }
+}
+
+// Helper: calcula la LatLng objetivo para que el cursor quede
+// al mismo nivel vertical que el velocímetro/alerta, centrado horizontal
+function getOffsetCenter(lat,lng){
+  const mapH=map.getContainer().offsetHeight;
+  // Posición del cursor: mismo nivel que speedometer (bottom ~185px + 36px mitad icono)
+  const targetY=mapH - 185 - 36;
+  // Centro horizontal
+  const targetX=map.getContainer().offsetWidth/2;
+  
+  // Mover el centro del mapa para que [lat,lng] quede en (targetX, targetY)
+  const currentPt=map.latLngToContainerPoint([lat,lng]);
+  const centerPt=map.latLngToContainerPoint(map.getCenter());
+  return map.containerPointToLatLng(L.point(
+    centerPt.x + (currentPt.x - targetX),
+    centerPt.y + (currentPt.y - targetY)
+  ));
+}
+
+// Actualizar el transform-origin del bearing wrap para que rote
+// alrededor de la posición del cursor (no del centro de la pantalla)
+function updateBearingOrigin(){
+  const w=ensureBearingWrap();
+  if(!w)return;
+  const mapH=map.getContainer().offsetHeight;
+  const mapW=map.getContainer().offsetWidth;
+  const cursorY=mapH - 185 - 36;
+  const cursorX=mapW/2;
+  w.style.transformOrigin=`${cursorX}px ${cursorY}px`;
+}
+// Observer para detectar cambios de altura en la barra
+const _barObs=new ResizeObserver(()=>updateFloatingButtons());
+document.addEventListener('DOMContentLoaded',()=>{
+  const bar=document.getElementById('bottomBar');
+  if(bar)_barObs.observe(bar);
+  updateFloatingButtons();
+  updateBearingOrigin();
+});
+// Actualizar origin al redimensionar pantalla
+window.addEventListener('resize',()=>{ updateBearingOrigin(); updateFloatingButtons(); });
+// Cerrar panel al tocar el mapa
+
+function renderResults(items){
+  const el=document.getElementById('resultsList');
+  if(!items.length){el.innerHTML='<div style="text-align:center;color:rgba(255,255,255,0.35);padding:14px;font-size:13px">Sin resultados</div>';return;}
+  el.innerHTML=items.map(c=>`<div class="result-row" onclick="selectClient('${c.id}')"><div class="rpin">📍</div><div class="rinfo"><div class="rname">${c.nombre}</div><div class="rsub">${c.direccion||c.zona||c.codigo||''}</div></div><div class="rdist">${c.dist<1?Math.round(c.dist*1000)+'m':c.dist.toFixed(1)+'km'}</div></div>`).join('');
+}
+function collapseSearch(){collapseSearchPanel();}
+function selectClient(id){const c=allClients.find(x=>x.id===id);if(!c)return;collapseSearchPanel();isFollowing=false;map.flyTo([c.lat,c.lng],18,{duration:0.5});setTimeout(()=>showClientPopup(c),350);}
+function showClientPopup(c){
+  selectedClient=c;
+  document.getElementById('popupName').textContent=c.nombre||'Cliente';
+  const dist=userLat?hav(userLat,userLng,c.lat,c.lng):0;
+  document.getElementById('popupAddr').textContent=[c.codigo&&`Cód: ${c.codigo}`,c.zona,c.telefono&&`📞 ${c.telefono}`,dist>0&&(dist<1?Math.round(dist*1000)+'m':dist.toFixed(1)+'km')].filter(Boolean).join(' · ');
+  const popup=document.getElementById('clientPopup');
+  const barH=document.getElementById('bottomBar')?.offsetHeight||145;
+  popup.style.bottom=(barH+8)+'px';
+  popup.classList.add('visible');
+}
+function closePopup(){document.getElementById('clientPopup').classList.remove('visible');selectedClient=null;}
+
+// ═══ WAZE / GMAPS ═══
+function openWaze(){
+  if(!selectedClient)return;
+  // Guardar coords ANTES de closePopup (que pone selectedClient=null)
+  const lat=selectedClient.lat,lng=selectedClient.lng;
+  closePopup();
+  if(window.Android?.openWaze){window.Android.openWaze(lat,lng);return;}
+  // Fallback web (navegador externo via location.href)
+  location.href=`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+}
+function openGoogleMaps(){
+  if(!selectedClient)return;
+  // Guardar coords ANTES de closePopup (que pone selectedClient=null)
+  const lat=selectedClient.lat,lng=selectedClient.lng;
+  closePopup();
+  if(window.Android?.openGoogleMaps){window.Android.openGoogleMaps(lat,lng);return;}
+  // Fallback web
+  location.href=`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+}
+
+// ═══ RUTA ═══
+let routeCache={};
+function routeCacheKey(la1,lo1,la2,lo2){return `${la1.toFixed(3)},${lo1.toFixed(3)}-${la2.toFixed(3)},${lo2.toFixed(3)}`;}
+
+function startRoutePreview(){
+  if(!selectedClient||!userLat)return;
+  navTarget=selectedClient;closePopup();
+  document.getElementById('routeSheet').classList.add('active');
+  document.getElementById('routeEta').textContent='...';
+  document.getElementById('routeDist').textContent='';
+  document.getElementById('routeName').textContent=`Hacia ${navTarget.nombre||'cliente'}`;
+  document.getElementById('routeInfo').textContent='Calculando mejor ruta...';
+
+  // Limpiar ruta anterior
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
+
+  // Colocar bandera de meta en el destino
+  if(destMarker){map.removeLayer(destMarker);destMarker=null;}
+  destMarker=L.marker([navTarget.lat,navTarget.lng],{icon:FLAG_ICON,zIndexOffset:900}).addTo(map);
+  map.flyToBounds(L.latLngBounds([[userLat,userLng],[navTarget.lat,navTarget.lng]]),{padding:[80,120],duration:0.8,maxZoom:17});
+  fetchRoute();
+}
+function cancelRoute(){
+  document.getElementById('routeSheet').classList.remove('active');
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
+  if(destMarker){map.removeLayer(destMarker);destMarker=null;}
+  navTarget=null;document.getElementById('searchPanel').style.display='';
+}
+
+async function fetchRoute(){
+  if(!navTarget)return;
+  const cacheKey=routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
+  if(routeCache[cacheKey]){
+    console.log('Route from cache');
+    onRouteResult(routeCache[cacheKey]);
+    return;
+  }
+
+  // Try Android bridge first
+  if(window.Android?.fetchRoute){
+    console.log('Fetching route via Android bridge');
+    window.Android.fetchRoute(userLat,userLng,navTarget.lat,navTarget.lng);
+    // Set timeout - if Android doesn't respond in 10s, try OSRM directly
+    setTimeout(()=>{
+      if(!routeLine && navTarget){
+        console.log('Android bridge timeout, trying OSRM...');
+        fetchRouteOSRM();
+      }
+    }, 10000);
+    return;
+  }
+
+  fetchRouteOSRM();
+}
+
+async function fetchRouteOSRM(){
+  const servers=[
+    'https://router.project-osrm.org',
+    'https://routing.openstreetmap.de/routed-car',
+    'https://router.project-osrm.org'  // retry first server
+  ];
+  for(const s of servers){
+    try{
+      console.log('Trying OSRM:', s);
+      const url=`${s}/route/v1/driving/${userLng},${userLat};${navTarget.lng},${navTarget.lat}?overview=full&geometries=geojson&steps=true`;
+      const r=await fetch(url,{signal:AbortSignal.timeout(15000)});
+      if(!r.ok){console.log('Server returned',r.status);continue;}
+      const d=await r.json();
+      if(d.routes?.[0]){
+        console.log('Route found! Points:',d.routes[0].geometry.coordinates.length);
+        onRouteResult(d);
+        return;
+      }
+    }catch(e){console.log('OSRM error:',e.message);continue;}
+  }
+  console.log('All OSRM servers failed');
+  document.getElementById('routeEta').textContent='--';
+  document.getElementById('routeName').textContent='Sin ruta disponible';
+  document.getElementById('routeInfo').textContent='Usá Waze o Google Maps para navegar';
+}
+
+function onRouteResult(data){
+  if(typeof data==='string')data=JSON.parse(data);
+  if(!data.routes?.[0]){console.log('No routes in data');return;}
+  if(!navTarget){console.log('navTarget is null');return;}
+
+  const route=data.routes[0];
+  const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
+  console.log('Drawing route with',coords.length,'points');
+
+  // Cache
+  if(userLat&&navTarget){
+    const key=routeCacheKey(userLat,userLng,navTarget.lat,navTarget.lng);
+    if(!routeCache[key]) routeCache[key]=data;
+  }
+
+  // Limpiar línea anterior
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
+  if(window._routeTraveled){map.removeLayer(window._routeTraveled);window._routeTraveled=null;}
+
+  // Guardar coords y resetear progreso
+  routeCoords=coords;
+  lastProgressIdx=-1;
+
+  // Dibujar ruta morada completa (se irá actualizando al avanzar)
+  window._routeLineBg=L.polyline(coords,{color:'#C9A0F0',weight:13,opacity:0.4,lineJoin:'round',lineCap:'round'}).addTo(map);
+  routeLine=L.polyline(coords,{color:'#7B2FBE',weight:7,opacity:0.9,lineJoin:'round',lineCap:'round'}).addTo(map);
+  console.log('Route drawn successfully');
+
+  map.flyToBounds(L.latLngBounds(coords),{padding:[60,100],duration:0.8,maxZoom:17});
+
+  const km=route.distance/1000,min=Math.round(route.duration/60);
+  document.getElementById('routeEta').textContent=`${min} min`;
+  document.getElementById('routeDist').textContent=km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
+  const roads=(route.legs?.[0]?.steps||[]).filter(s=>s.name&&s.name.length>3&&s.distance>300).map(s=>s.name);
+  document.getElementById('routeName').textContent=[...new Set(roads)].slice(0,2).join(' · ')||`Hacia ${navTarget.nombre||'cliente'}`;
+  document.getElementById('routeInfo').textContent='✅ Mejor ruta · Tráfico habitual';
+}
+function onRouteResultFromAndroid(){
+  try{
+    if(window._routeJson){
+      console.log('Route received from Android');
+      onRouteResult(window._routeJson);
+    } else {
+      console.log('Android returned empty route');
+      fetchRouteOSRM(); // Fallback to direct OSRM
+    }
+  }catch(e){
+    console.log('Error processing Android route:',e);
+    fetchRouteOSRM();
+  }
+}
+
+function onRouteError(){
+  console.log('Android bridge route error, trying OSRM directly...');
+  fetchRouteOSRM(); // Fallback: try OSRM from JavaScript
+}
+
+function startActiveNav(){
+  navActive=true;
+  document.getElementById('routeSheet').classList.remove('active');
+  document.getElementById('navTop').classList.add('active');
+  collapseSearchPanel();
+  document.getElementById('searchPanel').style.display='none';
+  document.getElementById('navPanel').classList.add('active');
+  isFollowing=true;
+
+  // FORZAR zoom cercano
+  map.setView(getOffsetCenter(userLat,userLng),20,{animate:false});
+  setTimeout(()=>{
+    map.setView(getOffsetCenter(userLat,userLng),20,{animate:true,duration:0.5});
+  },300);
+  updateNavInfo();
+}
+function updateNavInfo(){
+  if(!navTarget||!userLat)return;
+  const dist=hav(userLat,userLng,navTarget.lat,navTarget.lng);
+  const spd=parseInt(document.getElementById('speedVal').textContent)||5;
+  const etaMin=Math.max(1,Math.round((dist/(spd||5))*60));
+  const arrv=new Date(Date.now()+etaMin*60000).toLocaleTimeString('es-CR',{hour:'numeric',minute:'2-digit',hour12:true}).toUpperCase();
+  document.getElementById('navArrival').textContent=arrv;
+  document.getElementById('navTopDist').textContent=dist<1?`${Math.round(dist*1000)} m`:`${dist.toFixed(1)} km`;
+  document.getElementById('navTopStreet').textContent=navTarget.nombre||'';
+  document.getElementById('navRemainTime').textContent=etaMin<60?`${etaMin} min`:`${Math.floor(etaMin/60)}h ${etaMin%60}m`;
+  document.getElementById('navRemainDist').textContent=dist<1?`${Math.round(dist*1000)} m`:`${dist.toFixed(1)} km`;
+  if(dist<0.05){document.getElementById('navArrival').textContent='✅ ¡Llegaste!';setTimeout(stopNavigation,3000);}
+}
+function stopNavigation(){
+  navActive=false;navTarget=null;
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
+  if(window._routeTraveled){map.removeLayer(window._routeTraveled);window._routeTraveled=null;}
+  routeCoords=[];lastProgressIdx=-1;
+  if(destMarker){map.removeLayer(destMarker);destMarker=null;}
+  document.getElementById('navTop').classList.remove('active');
+  document.getElementById('navPanel').classList.remove('active');
+  document.getElementById('routeSheet').classList.remove('active');
+  document.getElementById('searchPanel').style.display='';
+  isFollowing=true;recenter();
+}
+
+// ═══ MENÚ ═══
+function toggleMenu(){const w=document.getElementById('menuWrap');w.style.display=w.style.display==='block'?'none':'block';}
+function closeMenu(){document.getElementById('menuWrap').style.display='none';}
+function reportAlert(){}
+
+// ═══ PROGRESO DE RUTA (Waze-style: tramo recorrido se desvanece) ═══
+function closestPointOnRoute(lat,lng){
+  let bestIdx=0,bestDist=Infinity;
+  for(let i=0;i<routeCoords.length;i++){
+    const d=hav(lat,lng,routeCoords[i][0],routeCoords[i][1]);
+    if(d<bestDist){bestDist=d;bestIdx=i;}
+  }
+  return bestIdx;
+}
+function updateRouteProgress(lat,lng){
+  if(!routeCoords.length||!navActive)return;
+  const idx=closestPointOnRoute(lat,lng);
+  if(idx===lastProgressIdx)return;
+  lastProgressIdx=idx;
+
+  // Eliminar capas anteriores
+  if(window._routeTraveled){map.removeLayer(window._routeTraveled);window._routeTraveled=null;}
+  if(window._routeLineBg){map.removeLayer(window._routeLineBg);window._routeLineBg=null;}
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+
+  const traveled=routeCoords.slice(0,idx+1);
+  const remaining=routeCoords.slice(idx);
+
+  // Tramo recorrido: morado muy claro y tenue
+  if(traveled.length>=2){
+    window._routeTraveled=L.polyline(traveled,{color:'#C9A0F0',weight:7,opacity:0.28,lineJoin:'round',lineCap:'round'}).addTo(map);
+  }
+  // Tramo pendiente: morado oscuro normal
+  if(remaining.length>=2){
+    window._routeLineBg=L.polyline(remaining,{color:'#C9A0F0',weight:13,opacity:0.4,lineJoin:'round',lineCap:'round'}).addTo(map);
+    routeLine=L.polyline(remaining,{color:'#7B2FBE',weight:7,opacity:0.9,lineJoin:'round',lineCap:'round'}).addTo(map);
+  }
+}
+
+// ═══ UTILS ═══
+function hav(la1,lo1,la2,lo2){const R=6371,dLa=(la2-la1)*Math.PI/180,dLo=(lo2-lo1)*Math.PI/180;const a=Math.sin(dLa/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLo/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
+
+setInterval(()=>{if(userLat&&!navActive)renderNearby();},15000);
+// Iniciar Firebase directamente — versión standalone no necesita USER_ID de tracking
+setTimeout(()=>initFirebase(),1000);
+</script>
+</body>
+</html>
