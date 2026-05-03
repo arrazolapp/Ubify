@@ -637,54 +637,69 @@ function onSpeedometerClick(){if(!isFollowing)recenter();}
 map.on('dragstart',()=>{isFollowing=false;document.getElementById('speedometer').classList.add('recenter-mode');});
 
 // ═══ ROTACIÓN MANUAL CON DOS DEDOS (estilo Waze) ═══
+// Interceptamos ANTES de que Leaflet procese los eventos touch.
+// Cuando se detectan 2 dedos con rotación dominante, bloqueamos
+// el evento para que Leaflet no haga zoom/pan y aplicamos nosotros la rotación.
 (function(){
-  const mapEl = document.getElementById('map');
-  let touch0 = null, touch1 = null;
-  let startAngle = 0, startBearing = 0;
-  let manualBearing = 0; // bearing acumulado manualmente
-  let isRotating = false;
+  let _startAngle = 0;
+  let _startBearing = 0;
+  let _isRotating = false;
+  let _manualBearing = 0;
+  let _lastDist = 0;
 
-  function getTouchAngle(t0, t1){
-    const dx = t1.clientX - t0.clientX;
-    const dy = t1.clientY - t0.clientY;
-    return Math.atan2(dy, dx) * 180 / Math.PI;
+  function angle2(t0, t1){
+    return Math.atan2(t1.clientY - t0.clientY, t1.clientX - t0.clientX) * 180 / Math.PI;
+  }
+  function dist2(t0, t1){
+    const dx = t1.clientX - t0.clientX, dy = t1.clientY - t0.clientY;
+    return Math.sqrt(dx*dx + dy*dy);
   }
 
-  mapEl.addEventListener('touchstart', function(e){
+  // Captura en fase de captura (antes de Leaflet) con passive:false para poder hacer preventDefault
+  document.getElementById('map').addEventListener('touchstart', function(e){
     if(e.touches.length === 2){
-      touch0 = e.touches[0];
-      touch1 = e.touches[1];
-      startAngle = getTouchAngle(touch0, touch1);
-      startBearing = manualBearing;
-      isRotating = true;
+      _startAngle  = angle2(e.touches[0], e.touches[1]);
+      _startBearing = _manualBearing;
+      _lastDist    = dist2(e.touches[0], e.touches[1]);
+      _isRotating  = false; // aún no sabemos si es rotación o zoom
     }
-  }, {passive: true});
+  }, {passive: true, capture: true});
 
-  mapEl.addEventListener('touchmove', function(e){
-    if(!isRotating || e.touches.length !== 2) return;
-    const t0 = e.touches[0];
-    const t1 = e.touches[1];
-    const currentAngle = getTouchAngle(t0, t1);
-    const delta = currentAngle - startAngle;
-    manualBearing = startBearing + delta;
-    // Aplicar rotación sin cambiar el heading del GPS
-    setMapBearing(manualBearing);
-    // Al rotar manualmente desactiva el follow de heading automático
-    isFollowing = false;
-    document.getElementById('speedometer').classList.add('recenter-mode');
-  }, {passive: true});
+  document.getElementById('map').addEventListener('touchmove', function(e){
+    if(e.touches.length !== 2) return;
 
-  mapEl.addEventListener('touchend', function(e){
+    const t0 = e.touches[0], t1 = e.touches[1];
+    const curAngle = angle2(t0, t1);
+    const curDist  = dist2(t0, t1);
+    const deltaRot = curAngle - _startAngle;
+    const deltaZoom = Math.abs(curDist - _lastDist);
+
+    // Si la rotación supera 8° y es mayor que el cambio de zoom → modo rotación
+    if(!_isRotating && Math.abs(deltaRot) > 8 && Math.abs(deltaRot) > deltaZoom * 0.5){
+      _isRotating = true;
+    }
+
+    if(_isRotating){
+      e.preventDefault(); // evitar que Leaflet haga zoom/pan
+      e.stopPropagation();
+      _manualBearing = _startBearing + deltaRot;
+      setMapBearing(_manualBearing);
+      isFollowing = false;
+      document.getElementById('speedometer').classList.add('recenter-mode');
+    }
+
+    _lastDist = curDist;
+  }, {passive: false, capture: true});
+
+  document.getElementById('map').addEventListener('touchend', function(e){
     if(e.touches.length < 2){
-      isRotating = false;
-      touch0 = null;
-      touch1 = null;
+      _isRotating = false;
     }
-  }, {passive: true});
+  }, {passive: true, capture: true});
 
-  // Exponer la función para que recenter() también restaure el bearing manual
-  window._getManualBearing = function(){ return manualBearing; };
-  window._setManualBearing = function(b){ manualBearing = b; };
+  // Exponer para recenter()
+  window._getManualBearing = function(){ return _manualBearing; };
+  window._setManualBearing = function(b){ _manualBearing = b; };
 })();
 map.on('click',()=>{closePopup();collapseSearchPanel();});
 function onGpsUpdate(lat,lng,accuracy,speed){updateUserPosition(lat,lng,accuracy,speed);}
