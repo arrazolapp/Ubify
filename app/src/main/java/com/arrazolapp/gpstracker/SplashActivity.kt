@@ -109,3 +109,9 @@ class SplashActivity : AppCompatActivity() {
         // No se puede salir durante el splash
     }
 }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        // No se puede salir durante el splash
+    }
+}
