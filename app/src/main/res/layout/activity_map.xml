@@ -1,15 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="#0f0f0f">
 
-    
-    <!-- WebView for map -->
+    <!-- WebView ocupa toda la pantalla sin barra nativa -->
     <android.webkit.WebView
         android:id="@+id/webMap"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-</LinearLayout>
+    <!-- Placeholder invisible — requerido por compatibilidad con código existente -->
+    <Button
+        android:id="@+id/btnTheme"
+        android:layout_width="wrap_content"
+        android:layout_height="36dp"
+        android:text="🌓"
+        android:textSize="18sp"
+        android:backgroundTint="#2d2d2d"
+        android:visibility="gone"
+        android:minWidth="48dp" />
+
+</FrameLayout>
+
