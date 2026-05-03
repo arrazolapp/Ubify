@@ -28,7 +28,7 @@
         android:id="@+id/splashBee"
         android:layout_width="260dp"
         android:layout_height="260dp"
-        android:src="@mipmap/ic_launcher"
+        android:src="@drawable/splash_bee"
         android:scaleType="fitCenter"
         android:contentDescription="Ubeefy bee"
         app:layout_constraintTop_toTopOf="parent"
