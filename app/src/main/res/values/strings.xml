@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Ubify</string>
+    <string name="app_name">Ubeefy</string>
 
+    <!-- Tema principal de la app -->
     <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/naranja</item>
         <item name="colorPrimaryDark">@color/naranja_oscuro</item>
@@ -10,4 +11,14 @@
         <item name="android:navigationBarColor">@color/negro</item>
         <item name="android:windowBackground">@color/negro</item>
     </style>
+
+    <!-- Tema para el Splash: fondo amarillo, sin barra, pantalla completa -->
+    <style name="Theme.Splash" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/amarillo_splash</item>
+        <item name="android:statusBarColor">@color/amarillo_splash</item>
+        <item name="android:navigationBarColor">@color/amarillo_splash</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
 </resources>
