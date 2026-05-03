@@ -626,6 +626,8 @@ function recenter(){
   isFollowing=true;
   document.getElementById('speedometer').classList.remove('recenter-mode');
   if(!userLat)return;
+  // Sincronizar bearing manual con el heading del GPS
+  if(window._setManualBearing) window._setManualBearing(-curH);
   setMapBearing(-curH);
   // Centrar suavemente como Waze
   map.flyTo(getOffsetCenter(userLat,userLng),20,{duration:0.4});
@@ -633,6 +635,57 @@ function recenter(){
 function centerOnUser(){recenter();}
 function onSpeedometerClick(){if(!isFollowing)recenter();}
 map.on('dragstart',()=>{isFollowing=false;document.getElementById('speedometer').classList.add('recenter-mode');});
+
+// ═══ ROTACIÓN MANUAL CON DOS DEDOS (estilo Waze) ═══
+(function(){
+  const mapEl = document.getElementById('map');
+  let touch0 = null, touch1 = null;
+  let startAngle = 0, startBearing = 0;
+  let manualBearing = 0; // bearing acumulado manualmente
+  let isRotating = false;
+
+  function getTouchAngle(t0, t1){
+    const dx = t1.clientX - t0.clientX;
+    const dy = t1.clientY - t0.clientY;
+    return Math.atan2(dy, dx) * 180 / Math.PI;
+  }
+
+  mapEl.addEventListener('touchstart', function(e){
+    if(e.touches.length === 2){
+      touch0 = e.touches[0];
+      touch1 = e.touches[1];
+      startAngle = getTouchAngle(touch0, touch1);
+      startBearing = manualBearing;
+      isRotating = true;
+    }
+  }, {passive: true});
+
+  mapEl.addEventListener('touchmove', function(e){
+    if(!isRotating || e.touches.length !== 2) return;
+    const t0 = e.touches[0];
+    const t1 = e.touches[1];
+    const currentAngle = getTouchAngle(t0, t1);
+    const delta = currentAngle - startAngle;
+    manualBearing = startBearing + delta;
+    // Aplicar rotación sin cambiar el heading del GPS
+    setMapBearing(manualBearing);
+    // Al rotar manualmente desactiva el follow de heading automático
+    isFollowing = false;
+    document.getElementById('speedometer').classList.add('recenter-mode');
+  }, {passive: true});
+
+  mapEl.addEventListener('touchend', function(e){
+    if(e.touches.length < 2){
+      isRotating = false;
+      touch0 = null;
+      touch1 = null;
+    }
+  }, {passive: true});
+
+  // Exponer la función para que recenter() también restaure el bearing manual
+  window._getManualBearing = function(){ return manualBearing; };
+  window._setManualBearing = function(b){ manualBearing = b; };
+})();
 map.on('click',()=>{closePopup();collapseSearchPanel();});
 function onGpsUpdate(lat,lng,accuracy,speed){updateUserPosition(lat,lng,accuracy,speed);}
 if(navigator.geolocation){
