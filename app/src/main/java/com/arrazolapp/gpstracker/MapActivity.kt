@@ -13,8 +13,6 @@ import android.view.WindowManager
 import android.webkit.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.gms.location.*
 
 class MapActivity : AppCompatActivity() {
@@ -39,17 +37,11 @@ class MapActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // ── Pantalla completa edge-to-edge (sin barra nativa) ──
+        // Pantalla completa sin barra nativa de la app (pero respetando barras del sistema)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         setContentView(R.layout.activity_map)
-
-        // Ocultar status bar para inmersión total
-        val insetsController = WindowInsetsControllerCompat(window, window.decorView)
-        insetsController.hide(WindowInsetsCompat.Type.statusBars())
-        insetsController.systemBarsBehavior =
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
         webMap = findViewById(R.id.webMap)
 
