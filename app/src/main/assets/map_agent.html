@@ -544,7 +544,6 @@ function closeCursorPicker(){ document.getElementById('cursorPicker').classList.
 function lerpAngle(a,b,t){let d=b-a;while(d>180)d-=360;while(d<-180)d+=360;return a+d*t;}
 
 let _bWrap=null;
-let _bearingDeg=0; // bearing actual del mapa (grados)
 function ensureBearingWrap(){
   if(_bWrap)return _bWrap;
   const pane=document.querySelector('#map .leaflet-map-pane');
@@ -556,7 +555,6 @@ function ensureBearingWrap(){
   return _bWrap;
 }
 function setMapBearing(deg){
-  _bearingDeg=deg; // guardar bearing actual
   const w=ensureBearingWrap();
   if(!w) return;
   updateBearingOrigin();
@@ -935,37 +933,17 @@ function updateFloatingButtons(){
 // al mismo nivel vertical que el velocímetro/alerta, centrado horizontal
 function getOffsetCenter(lat,lng){
   const mapH=map.getContainer().offsetHeight;
-  const mapW=map.getContainer().offsetWidth;
-
-  // Posición FIJA del cursor en pantalla (no cambia nunca)
-  const targetX=mapW/2;
+  // Posición del cursor: mismo nivel que speedometer (bottom ~185px + 36px mitad icono)
   const targetY=mapH - 185 - 36;
-
-  // Posición actual del punto lat/lng en el sistema de coordenadas del mapa
-  // (sin rotación — Leaflet siempre trabaja en coordenadas sin rotar)
+  // Centro horizontal
+  const targetX=map.getContainer().offsetWidth/2;
+  
+  // Mover el centro del mapa para que [lat,lng] quede en (targetX, targetY)
   const currentPt=map.latLngToContainerPoint([lat,lng]);
   const centerPt=map.latLngToContainerPoint(map.getCenter());
-
-  // Delta en coordenadas del mapa (sin rotación)
-  const dxMap = currentPt.x - targetX;
-  const dyMap = currentPt.y - targetY;
-
-  // Si el mapa está rotado, el punto en coordenadas de mapa
-  // NO coincide con el punto visual en pantalla.
-  // Debemos compensar: el bearing wrap rota alrededor del cursor (targetX, targetY).
-  // Para que lat/lng quede visualmente en (targetX, targetY),
-  // calculamos cuánto debe moverse el CENTRO del mapa.
-  // Como la rotación es alrededor del cursor, el desplazamiento del centro
-  // se aplica en el espacio rotado — necesitamos des-rotar el delta.
-  const rad = _bearingDeg * Math.PI / 180;
-  const cosA = Math.cos(-rad); // inversa: des-rotar
-  const sinA = Math.sin(-rad);
-  const dxRot = dxMap * cosA - dyMap * sinA;
-  const dyRot = dxMap * sinA + dyMap * cosA;
-
   return map.containerPointToLatLng(L.point(
-    centerPt.x + dxRot,
-    centerPt.y + dyRot
+    centerPt.x + (currentPt.x - targetX),
+    centerPt.y + (currentPt.y - targetY)
   ));
 }
 
@@ -974,19 +952,11 @@ function getOffsetCenter(lat,lng){
 function updateBearingOrigin(){
   const w=ensureBearingWrap();
   if(!w)return;
-  const bar=document.getElementById('bottomBar');
-  const barH=bar?bar.offsetHeight:0;
   const mapH=map.getContainer().offsetHeight;
   const mapW=map.getContainer().offsetWidth;
-  // Mismo punto que getOffsetCenter — cursor siempre aquí
-  const cursorX=mapW/2;
   const cursorY=mapH - 185 - 36;
+  const cursorX=mapW/2;
   w.style.transformOrigin=`${cursorX}px ${cursorY}px`;
-  // Sincronizar el labelsPane también
-  const labelsPane=map.getPane('labelsPane');
-  if(labelsPane){
-    labelsPane.style.transformOrigin=`${cursorX}px ${cursorY}px`;
-  }
 }
 // Observer para detectar cambios de altura en la barra
 const _barObs=new ResizeObserver(()=>updateFloatingButtons());
@@ -1276,3 +1246,4 @@ setTimeout(()=>{if(!USER_ID)initFirebase();},1500);
 </script>
 </body>
 </html>
+
