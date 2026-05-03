@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Ubify Navegación</title>
+<title>Ubeefy</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;--bearing:0deg}
@@ -386,8 +386,8 @@ body.light{background:#e8e0d5}
   <div style="position:absolute;inset:0;background:rgba(0,0,0,0.45)" onclick="closeMenu()"></div>
   <div style="position:absolute;top:0;left:0;bottom:0;width:272px;background:#1b2433;display:flex;flex-direction:column;box-shadow:4px 0 28px rgba(0,0,0,0.5);animation:menuIn .25s ease">
     <div style="padding:52px 20px 20px;background:rgba(74,144,217,0.9)">
-      <div style="font-size:22px;font-weight:800;color:white">🧭 Ubify Navegación</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:3px" id="menuUser">Navigator</div>
+      <div style="font-size:22px;font-weight:800;color:white">🐝 Ubeefy</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:3px" id="menuUser">Ubeefy</div>
     </div>
     <div style="flex:1;overflow-y:auto">
       <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;color:rgba(255,255,255,0.8);font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05)" onclick="closeMenu();toggleTheme()">🌓 Modo claro / oscuro</div>
@@ -404,11 +404,11 @@ body.light{background:#e8e0d5}
 <script>
 // ═══ CONFIG ═══
 // Versión standalone — solo navegación, sin tracking
-let COMPANY_ID='demo_corp', USER_ID='nav_user', userName='Navigator';
+let COMPANY_ID='demo_corp', USER_ID='nav_user', userName='Ubeefy';
 function setConfig(c,u,n){
   COMPANY_ID=c;
   USER_ID=u||'nav_user';
-  userName=n||'Navigator';
+  userName=n||'Ubeefy';
   document.getElementById('menuUser').textContent=userName;
   initFirebase();
 }
