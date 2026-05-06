@@ -184,7 +184,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateUI() {
         val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
-        val allowStop = prefs.getBoolean("allowStop", true)
+        val allowStop = prefs.getBoolean("allowStop", false)
 
         if (TrackingService.isTracking) {
             // ── GPS ACTIVE ──
