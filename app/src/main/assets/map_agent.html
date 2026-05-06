@@ -780,76 +780,12 @@ map.on('dragstart',()=>{isFollowing=false;document.getElementById('speedometer')
 })();
 map.on('click',()=>{closePopup();collapseSearchPanel();});
 function onGpsUpdate(lat,lng,accuracy,speed){updateUserPosition(lat,lng,accuracy,speed);}
-
-// ═══ TRACKING BLOQUEADO / SIEMPRE ACTIVO ═══
-let gpsWatchId=null;
-let trackingLocked=true;
-
-function startLockedTracking(){
-  if(!navigator.geolocation || gpsWatchId!==null) return;
-
-  gpsWatchId=navigator.geolocation.watchPosition(
-    p=>{
-      updateUserPosition(
-        p.coords.latitude,
-        p.coords.longitude,
-        p.coords.accuracy,
-        p.coords.speed,
-        p.coords.heading
-      );
-    },
-    err=>{
-      console.log('GPS tracking error:',err);
-      // Reintentar automáticamente si algo falla
-      setTimeout(()=>{
-        gpsWatchId=null;
-        startLockedTracking();
-      },2000);
-    },
-    {
-      enableHighAccuracy:true,
-      maximumAge:1000,
-      timeout:15000
-    }
+if(navigator.geolocation){
+  navigator.geolocation.watchPosition(
+    p=>updateUserPosition(p.coords.latitude,p.coords.longitude,p.coords.accuracy,p.coords.speed,p.coords.heading),
+    ()=>{},{enableHighAccuracy:true,maximumAge:2000}
   );
 }
-
-// Iniciar tracking obligatorio
-startLockedTracking();
-
-// Protección extra: evitar que cualquier código detenga el tracking
-const _originalClearWatch=navigator.geolocation.clearWatch?.bind(navigator.geolocation);
-
-if(_originalClearWatch){
-  navigator.geolocation.clearWatch=function(id){
-    if(trackingLocked){
-      console.log('Tracking protegido: clearWatch bloqueado');
-      return;
-    }
-    return _originalClearWatch(id);
-  };
-}
-
-// Si la app vuelve del background, validar que el tracking siga activo
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible' && gpsWatchId===null){
-    startLockedTracking();
-  }
-});
-
-window.addEventListener('focus',()=>{
-  if(gpsWatchId===null){
-    startLockedTracking();
-  }
-});
-
-// Watchdog silencioso para mantener tracking vivo
-setInterval(()=>{
-  if(trackingLocked && gpsWatchId===null){
-    startLockedTracking();
-  }
-},5000);
-
 
 // ═══ CLIENTES ═══
 let allClients=[],clientMarkers={},selectedClient=null;
@@ -1310,5 +1246,7 @@ setTimeout(()=>{if(!USER_ID)initFirebase();},1500);
 </script>
 </body>
 </html>
+
+
 
 
