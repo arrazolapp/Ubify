@@ -154,20 +154,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun toggleTracking() {
         if (TrackingService.isTracking) {
-            // Check if admin locked stop
-            val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
-            val allowStop = prefs.getBoolean("allowStop", true)
-            if (!allowStop) {
-                AlertDialog.Builder(this)
-                    .setTitle("🔒 Modo Supervisado")
-                    .setMessage("El tracking está en modo supervisado.\n\nSolo tu administrador puede detenerlo. Contactalo si tenés dudas.")
-                    .setPositiveButton("Entendido", null)
-                    .show()
-                return
-            }
-            startService(Intent(this, TrackingService::class.java).apply {
-                action = TrackingService.ACTION_STOP
-            })
+            // El usuario NUNCA puede detener el tracking desde el celular
+            AlertDialog.Builder(this)
+                .setTitle("🔒 Modo Supervisado")
+                .setMessage("El tracking está en modo supervisado.\n\nSolo tu administrador puede detenerlo. Contactalo si tenés dudas.")
+                .setPositiveButton("Entendido", null)
+                .show()
+            return
         } else {
             if (!hasLocationPermission()) { checkPermissions(); return }
             val intent = Intent(this, TrackingService::class.java).apply {
@@ -183,27 +176,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateUI() {
-        val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
-        val allowStop = prefs.getBoolean("allowStop", false)
-
         if (TrackingService.isTracking) {
             // ── GPS ACTIVE ──
             liveContainer.visibility = View.VISIBLE
             liveDot.startAnimation(pulseAnim)
 
-            tvStatus.text = if (!allowStop) "GPS TRANSMITIENDO (SUPERVISADO)" else "GPS TRANSMITIENDO"
+            tvStatus.text = "GPS TRANSMITIENDO (SUPERVISADO)"
             tvStatus.setTextColor(ContextCompat.getColor(this, R.color.green))
 
-            if (!allowStop) {
-                // LOCKED mode
-                btnToggle.text = "🔒  MODO SUPERVISADO"
-                btnToggle.setBackgroundColor(ContextCompat.getColor(this, R.color.gris_oscuro))
-                lockMessage.visibility = View.VISIBLE
-            } else {
-                btnToggle.text = "⏹  DETENER TRACKING"
-                btnToggle.setBackgroundColor(ContextCompat.getColor(this, R.color.red))
-                lockMessage.visibility = View.GONE
-            }
+            // Siempre bloqueado: el usuario no puede detener
+            btnToggle.text = "🔒  MODO SUPERVISADO"
+            btnToggle.setBackgroundColor(ContextCompat.getColor(this, R.color.gris_oscuro))
+            lockMessage.visibility = View.VISIBLE
+
         } else {
             // ── GPS INACTIVE ──
             liveContainer.visibility = View.GONE
@@ -290,4 +275,3 @@ class MainActivity : AppCompatActivity() {
         return bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
     }
 }
-
