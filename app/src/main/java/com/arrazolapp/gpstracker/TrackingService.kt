@@ -57,7 +57,15 @@ class TrackingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
-                stopGPS()
+                // Verificar si el agente tiene permiso para detener el tracking
+                val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
+                val allowStop = prefs.getBoolean("allowStop", true)
+                if (allowStop) {
+                    stopGPS()
+                } else {
+                    // Ignorar — el tracking solo puede ser detenido por el admin
+                    Log.d(TAG, "ACTION_STOP ignorado: allowStop=false (solo el admin puede detener)")
+                }
                 return START_STICKY
             }
             ACTION_START -> {
