@@ -10,8 +10,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import android.webkit.*
-import android.widget.Button
-import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.location.*
 
@@ -37,18 +35,10 @@ class MapActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled", "MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        supportActionBar?.hide()
         setContentView(R.layout.activity_map)
 
         webMap = findViewById(R.id.webMap)
-        val btnBack = findViewById<ImageView>(R.id.btnBack)
-        val btnTheme = findViewById<Button>(R.id.btnTheme)
-
-        btnBack.setOnClickListener { finish() }
-        btnTheme.setOnClickListener {
-            isDark = !isDark
-            webMap.evaluateJavascript("toggleTheme()", null)
-            btnTheme.text = if (isDark) "🌓" else "☀️"
-        }
 
         webMap.settings.apply {
             javaScriptEnabled = true
