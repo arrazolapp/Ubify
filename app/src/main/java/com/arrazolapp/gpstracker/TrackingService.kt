@@ -22,6 +22,7 @@ class TrackingService : Service() {
         const val ACTION_START = "ACTION_START"
         const val ACTION_STOP = "ACTION_STOP"
         const val ACTION_STANDBY = "ACTION_STANDBY"
+        const val ACTION_WATCHDOG = "ACTION_WATCHDOG"
 
         var isRunning = false
             private set
@@ -33,6 +34,28 @@ class TrackingService : Service() {
     private var locationCallback: LocationCallback? = null
     private var controlListener: ValueEventListener? = null
     private var controlRef: DatabaseReference? = null
+
+    // ── WakeLock: evita que el CPU duerma y mate el servicio ──
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    // ── Watchdog: reinicia el GPS si deja de recibir updates ──
+    private val watchdogHandler = Handler(Looper.getMainLooper())
+    private var lastLocationTime = 0L
+    private val WATCHDOG_INTERVAL = 60_000L  // revisar cada 60s
+    private val WATCHDOG_TIMEOUT  = 90_000L  // si no hay update en 90s → reiniciar GPS
+
+    private val watchdogRunnable = object : Runnable {
+        override fun run() {
+            if (isTracking) {
+                val now = System.currentTimeMillis()
+                if (lastLocationTime > 0 && (now - lastLocationTime) > WATCHDOG_TIMEOUT) {
+                    Log.w(TAG, "Watchdog: sin updates por ${(now-lastLocationTime)/1000}s — reiniciando GPS")
+                    restartGPS()
+                }
+            }
+            watchdogHandler.postDelayed(this, WATCHDOG_INTERVAL)
+        }
+    }
 
     // ── Gestor de visitas a clientes ──
     private lateinit var visitaManager: VisitaManager
@@ -50,6 +73,17 @@ class TrackingService : Service() {
         fusedClient = LocationServices.getFusedLocationProviderClient(this)
         visitaManager = VisitaManager(this)
         createNotificationChannel()
+
+        // ── Adquirir WakeLock para que el CPU no duerma ──
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "Ubify::TrackingWakeLock"
+        ).apply { acquire(12 * 60 * 60 * 1000L) } // máx 12 horas
+
+        // ── Iniciar watchdog ──
+        watchdogHandler.postDelayed(watchdogRunnable, WATCHDOG_INTERVAL)
+        Log.d(TAG, "WakeLock adquirido + Watchdog iniciado")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -59,12 +93,12 @@ class TrackingService : Service() {
             ACTION_STOP -> {
                 // Verificar si el agente tiene permiso para detener el tracking
                 val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
-                val allowStop = prefs.getBoolean("allowStop", true)
+                // allowStop default=false — solo el admin puede detener
+                val allowStop = prefs.getBoolean("allowStop", false)
                 if (allowStop) {
                     stopGPS()
                 } else {
-                    // Ignorar — el tracking solo puede ser detenido por el admin
-                    Log.d(TAG, "ACTION_STOP ignorado: allowStop=false (solo el admin puede detener)")
+                    Log.d(TAG, "ACTION_STOP ignorado: solo el admin puede detener")
                 }
                 return START_STICKY
             }
@@ -121,6 +155,7 @@ class TrackingService : Service() {
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 val location = result.lastLocation ?: return
+                lastLocationTime = System.currentTimeMillis() // ── Watchdog timestamp ──
                 val speedKmh = if (location.hasSpeed()) (location.speed * 3.6).toInt() else 0
 
                 if (lastLat != 0.0 && lastLng != 0.0) {
@@ -221,7 +256,7 @@ class TrackingService : Service() {
 
                 val forceStart = data["forceStart"] as? Boolean ?: false
                 val forceStop = data["forceStop"] as? Boolean ?: false
-                val allowStop = data["allowStop"] as? Boolean ?: true
+                val allowStop = data["allowStop"] as? Boolean ?: false
                 val schedEnabled = data["scheduleEnabled"] as? Boolean ?: false
                 val allowedStart = data["allowedStart"] as? String
                 val allowedEnd = data["allowedEnd"] as? String
@@ -333,11 +368,7 @@ class TrackingService : Service() {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(if (showStop) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_MIN)
 
-        if (showStop) {
-            val stopIntent = Intent(this, TrackingService::class.java).apply { action = ACTION_STOP }
-            val stopPending = PendingIntent.getService(this, 1, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            builder.addAction(R.drawable.ic_notification, "Detener", stopPending)
-        }
+        // Botón Detener eliminado — el agente no puede detener desde la notificación
         return builder.build()
     }
 
@@ -362,14 +393,96 @@ class TrackingService : Service() {
 
     private fun Double.f(n: Int) = String.format("%.${n}f", this)
 
+    // ── Reiniciar GPS sin perder el estado de tracking ──
+    private fun restartGPS() {
+        Log.d(TAG, "Reiniciando GPS...")
+        locationCallback?.let { fusedClient.removeLocationUpdates(it) }
+        locationCallback = null
+        lastLocationTime = System.currentTimeMillis()
+
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10000)
+            .setMinUpdateIntervalMillis(5000)
+            .setMinUpdateDistanceMeters(5f)
+            .build()
+
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                val location = result.lastLocation ?: return
+                lastLocationTime = System.currentTimeMillis()
+                val speedKmh = if (location.hasSpeed()) (location.speed * 3.6).toInt() else 0
+
+                if (lastLat != 0.0 && lastLng != 0.0) {
+                    val dist = haversine(lastLat, lastLng, location.latitude, location.longitude)
+                    if (dist > 0.01) totalDistance += dist
+                    if (lastWasMoving && speedKmh < 3) { stopCount++; lastWasMoving = false }
+                    else if (speedKmh >= 3) lastWasMoving = true
+                }
+                lastLat = location.latitude
+                lastLng = location.longitude
+                lastSpeed = speedKmh
+                updateCount++
+
+                sendToFirebase(location.latitude, location.longitude, speedKmh)
+
+                val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
+                visitaManager.onLocationUpdate(
+                    lat        = location.latitude,
+                    lng        = location.longitude,
+                    companyId  = prefs.getString("company", "demo_corp") ?: "demo_corp",
+                    agenteName = prefs.getString("nombre", "Agente") ?: "Agente",
+                    agenteRol  = prefs.getString("rol", "vendedor") ?: "vendedor",
+                    webhookUrl = prefs.getString("webhookUrl", "") ?: ""
+                )
+
+                val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                nm.notify(NOTIFICATION_ID, buildNotification(
+                    "${location.latitude.f(4)}, ${location.longitude.f(4)} · ${speedKmh} km/h · #$updateCount", true
+                ))
+
+                sendBroadcast(Intent("GPS_UPDATE").apply {
+                    putExtra("lat", location.latitude)
+                    putExtra("lng", location.longitude)
+                    putExtra("speed", speedKmh)
+                    putExtra("accuracy", location.accuracy.toInt())
+                    putExtra("heading", if (location.hasBearing()) location.bearing else 0f)
+                    putExtra("updates", updateCount)
+                    putExtra("distance", totalDistance)
+                    putExtra("stops", stopCount)
+                    putExtra("battery", getBatteryLevel())
+                })
+            }
+        }
+        try {
+            fusedClient.requestLocationUpdates(locationRequest, locationCallback!!, Looper.getMainLooper())
+            Log.d(TAG, "GPS reiniciado correctamente")
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Sin permisos de GPS en restart", e)
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         controlListener?.let { controlRef?.removeEventListener(it) }
         controlListener = null
+        watchdogHandler.removeCallbacks(watchdogRunnable)
+
+        // ── Liberar WakeLock ──
+        try { if (wakeLock?.isHeld == true) wakeLock?.release() } catch (e: Exception) {}
+
+        // ── Si Android mató el servicio Y estaba trackeando → reiniciarlo inmediatamente ──
         if (isRunning) {
-            isRunning = false; isTracking = false
-            val i = Intent(this, TrackingService::class.java).apply { action = ACTION_STANDBY }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(i) else startService(i)
+            Log.w(TAG, "Servicio destruido — reiniciando automáticamente...")
+            isRunning = false
+            isTracking = false
+            val i = Intent(this, TrackingService::class.java).apply {
+                // Si estaba trackeando, reiniciar en modo tracking no en standby
+                action = if (isTracking) ACTION_START else ACTION_STANDBY
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(i)
+            } else {
+                startService(i)
+            }
         }
     }
 }
