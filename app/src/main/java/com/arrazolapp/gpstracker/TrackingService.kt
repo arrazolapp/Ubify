@@ -138,6 +138,10 @@ class TrackingService : Service() {
         isRunning = true
         isTracking = true
 
+        // ── Persistir estado para auto-reinicio ──
+        getSharedPreferences("agent_config", MODE_PRIVATE)
+            .edit().putBoolean("trackingActive", true).apply()
+
         val notification = buildNotification("Iniciando GPS...", true)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
@@ -221,6 +225,10 @@ class TrackingService : Service() {
         isTracking = false
         locationCallback?.let { fusedClient.removeLocationUpdates(it) }
         locationCallback = null
+
+        // ── Persistir estado: el admin lo detuvo, no reiniciar solo ──
+        getSharedPreferences("agent_config", MODE_PRIVATE)
+            .edit().putBoolean("trackingActive", false).apply()
 
         // ── Cerrar visita activa si hay una ──
         val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
@@ -469,14 +477,15 @@ class TrackingService : Service() {
         // ── Liberar WakeLock ──
         try { if (wakeLock?.isHeld == true) wakeLock?.release() } catch (e: Exception) {}
 
-        // ── Si Android mató el servicio Y estaba trackeando → reiniciarlo inmediatamente ──
+        // ── Android mató el servicio → reiniciarlo en el mismo modo que estaba ──
         if (isRunning) {
-            Log.w(TAG, "Servicio destruido — reiniciando automáticamente...")
+            Log.w(TAG, "Servicio destruido por Android — reiniciando automáticamente...")
+            // Capturar ANTES de resetear los flags
+            val wasTracking = isTracking
             isRunning = false
             isTracking = false
             val i = Intent(this, TrackingService::class.java).apply {
-                // Si estaba trackeando, reiniciar en modo tracking no en standby
-                action = if (isTracking) ACTION_START else ACTION_STANDBY
+                action = if (wasTracking) ACTION_START else ACTION_STANDBY
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(i)
