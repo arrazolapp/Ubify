@@ -1,8 +1,6 @@
 package com.arrazolapp.gpstracker
 
 import android.Manifest
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.content.*
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -61,21 +59,20 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        btnToggle = findViewById(R.id.btnToggle)
-        btnMap = findViewById(R.id.btnMap)
-        tvStatus = findViewById(R.id.tvStatus)
-        tvCoords = findViewById(R.id.tvCoords)
-        tvSpeed = findViewById(R.id.tvSpeed)
-        tvBattery = findViewById(R.id.tvBattery)
-        tvUpdates = findViewById(R.id.tvUpdates)
+        btnToggle  = findViewById(R.id.btnToggle)
+        btnMap     = findViewById(R.id.btnMap)
+        tvStatus   = findViewById(R.id.tvStatus)
+        tvCoords   = findViewById(R.id.tvCoords)
+        tvSpeed    = findViewById(R.id.tvSpeed)
+        tvBattery  = findViewById(R.id.tvBattery)
+        tvUpdates  = findViewById(R.id.tvUpdates)
         tvAccuracy = findViewById(R.id.tvAccuracy)
         tvAgentName = findViewById(R.id.tvAgentName)
         tvAgentRole = findViewById(R.id.tvAgentRole)
         liveContainer = findViewById(R.id.liveContainer)
-        liveDot = findViewById(R.id.liveDot)
+        liveDot    = findViewById(R.id.liveDot)
         lockMessage = findViewById(R.id.lockMessage)
 
-        // Check if configured
         val prefs = getSharedPreferences("agent_config", MODE_PRIVATE)
         val userId = prefs.getString("userId", "") ?: ""
 
@@ -85,12 +82,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Show agent info
         tvAgentName.text = prefs.getString("nombre", "Agente")
         val placa = prefs.getString("placa", "") ?: ""
         tvAgentRole.text = "${prefs.getString("rol", "")?.uppercase()} ${if (placa.isNotEmpty()) "• $placa" else ""}"
 
-        // Setup pulse animation for EN VIVO dot
         pulseAnim = AlphaAnimation(1f, 0.3f).apply {
             duration = 800
             repeatCount = Animation.INFINITE
@@ -98,17 +93,30 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnToggle.setOnClickListener { toggleTracking() }
-        btnMap.setOnClickListener {
-            startActivity(Intent(this, MapActivity::class.java))
-        }
+        btnMap.setOnClickListener { startActivity(Intent(this, MapActivity::class.java)) }
 
         checkPermissions()
         requestBatteryOptimization()
 
-        // Start service in STANDBY mode
+        // ── AUTO-ARRANQUE: si el tracking estaba activo antes de que Android
+        //    matara el servicio, lo reiniciamos automáticamente ──────────────
+        val wasTracking = prefs.getBoolean("trackingActive", false)
+
         if (!TrackingService.isRunning) {
+            val action = if (wasTracking) TrackingService.ACTION_START else TrackingService.ACTION_STANDBY
+            val intent = Intent(this, TrackingService::class.java).apply { this.action = action }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+            if (wasTracking) {
+                android.util.Log.d("MainActivity", "Auto-reiniciando tracking que estaba activo")
+            }
+        } else if (wasTracking && !TrackingService.isTracking) {
+            // El servicio está corriendo en STANDBY pero debería estar trackeando
             val intent = Intent(this, TrackingService::class.java).apply {
-                action = TrackingService.ACTION_STANDBY
+                action = TrackingService.ACTION_START
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(intent)
@@ -134,7 +142,6 @@ class MainActivity : AppCompatActivity() {
         updateUI()
         tvBattery.text = "${getBatteryLevel()}%"
 
-        // Periodic UI update (for remote start/stop)
         val uiUpdater = object : Runnable {
             override fun run() {
                 if (!isFinishing) {
@@ -157,12 +164,16 @@ class MainActivity : AppCompatActivity() {
             // El usuario NUNCA puede detener el tracking desde el celular
             AlertDialog.Builder(this)
                 .setTitle("🔒 Modo Supervisado")
-                .setMessage("El tracking está en modo supervisado.\n\nSolo tu administrador puede detenerlo. Contactalo si tenés dudas.")
+                .setMessage("El tracking está en modo supervisado.\n\nSolo tu administrador puede detenerlo.")
                 .setPositiveButton("Entendido", null)
                 .show()
             return
         } else {
             if (!hasLocationPermission()) { checkPermissions(); return }
+            // ── Guardar en prefs que el tracking fue iniciado ──
+            getSharedPreferences("agent_config", MODE_PRIVATE)
+                .edit().putBoolean("trackingActive", true).apply()
+
             val intent = Intent(this, TrackingService::class.java).apply {
                 action = TrackingService.ACTION_START
             }
@@ -177,30 +188,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateUI() {
         if (TrackingService.isTracking) {
-            // ── GPS ACTIVE ──
             liveContainer.visibility = View.VISIBLE
             liveDot.startAnimation(pulseAnim)
-
             tvStatus.text = "GPS TRANSMITIENDO (SUPERVISADO)"
             tvStatus.setTextColor(ContextCompat.getColor(this, R.color.green))
-
-            // Siempre bloqueado: el usuario no puede detener
             btnToggle.text = "🔒  MODO SUPERVISADO"
             btnToggle.setBackgroundColor(ContextCompat.getColor(this, R.color.gris_oscuro))
             lockMessage.visibility = View.VISIBLE
-
         } else {
-            // ── GPS INACTIVE ──
             liveContainer.visibility = View.GONE
             liveDot.clearAnimation()
             lockMessage.visibility = View.GONE
-
             btnToggle.text = "▶  INICIAR TRACKING"
             btnToggle.setBackgroundColor(ContextCompat.getColor(this, R.color.naranja))
-
             tvStatus.text = if (TrackingService.isRunning) "CONECTADO — ESPERANDO" else "GPS DESACTIVADO"
             tvStatus.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray))
-
             tvCoords.text = "--.----- , ---.-----"
             tvSpeed.text = "0"
             tvUpdates.text = "0"
@@ -222,7 +224,9 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             perms.add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        val needed = perms.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
+        val needed = perms.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
         if (needed.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, needed.toTypedArray(), 100)
         } else {
@@ -239,7 +243,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestBackgroundLocation() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
                 AlertDialog.Builder(this)
                     .setTitle("Ubicación en segundo plano")
                     .setMessage("Para que el tracking funcione con la app cerrada, seleccioná \"Permitir siempre\" en el siguiente diálogo.")
