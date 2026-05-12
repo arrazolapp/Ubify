@@ -15,9 +15,19 @@ class BootReceiver : BroadcastReceiver() {
             val userId = prefs.getString("userId", "") ?: ""
 
             if (userId.isNotEmpty()) {
-                Log.d("BootReceiver", "Iniciando TrackingService en STANDBY...")
+                // ── Si el tracking estaba activo antes de apagarse →
+                //    reiniciarlo directamente en modo tracking, no en standby ──
+                val wasTracking = prefs.getBoolean("trackingActive", false)
+                val action = if (wasTracking) {
+                    Log.d("BootReceiver", "Celular encendido — reiniciando tracking automáticamente")
+                    TrackingService.ACTION_START
+                } else {
+                    Log.d("BootReceiver", "Celular encendido — iniciando en STANDBY")
+                    TrackingService.ACTION_STANDBY
+                }
+
                 val serviceIntent = Intent(context, TrackingService::class.java).apply {
-                    action = TrackingService.ACTION_STANDBY
+                    this.action = action
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     context.startForegroundService(serviceIntent)
